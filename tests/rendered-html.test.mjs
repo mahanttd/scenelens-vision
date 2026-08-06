@@ -19,9 +19,11 @@ test("server-renders the SceneLens application shell", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>SceneLens/);
-  assert.match(html, /REAL-TIME VISUAL ASSISTANCE/);
+  assert.match(html, /REAL-TIME SECURITY AWARENESS/);
+  assert.match(html, /SECURITY INTELLIGENCE/);
+  assert.match(html, /does not detect firearms, identity, or intent/i);
   assert.match(html, /NO FACIAL RECOGNITION/);
-  assert.match(html, /Ask about this frame/);
+  assert.match(html, /Ask about this security frame/);
   assert.match(html, /CAMERA SOURCE/);
   assert.doesNotMatch(html, /aerospace|aircraft|airworthiness/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);

@@ -27,7 +27,7 @@ import type { Detection, HistoryRecord, ModelState, SourceKind } from "../lib/ty
 import { demoDetections, YoloDetector } from "../lib/yolo";
 
 const DEFAULT_RESULT =
-  "Choose a visual source, then ask a question. SceneLens will stay grounded in visible evidence and say when it is uncertain.";
+  "Choose a camera or image to monitor for people and supported potential hazards. SceneLens reports uncertainty and never infers identity or intent.";
 
 function uniqueId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -64,12 +64,24 @@ function createDemoScene() {
   context.fillRect(235, 250, 55, 250);
   context.fillRect(455, 250, 55, 250);
 
+  context.save();
+  context.translate(535, 365);
+  context.rotate(0.18);
   context.fillStyle = "#d9a441";
-  context.fillRect(520, 380, 90, 125);
-  context.strokeStyle = "#d9a441";
-  context.lineWidth = 18;
+  context.fillRect(0, 86, 24, 58);
+  context.fillStyle = "#d8e2e3";
+  context.fillRect(3, 0, 18, 92);
   context.beginPath();
-  context.arc(610, 425, 38, -Math.PI / 2, Math.PI / 2);
+  context.moveTo(3, 0);
+  context.lineTo(21, 0);
+  context.lineTo(12, -22);
+  context.closePath();
+  context.fill();
+  context.restore();
+  context.strokeStyle = "rgba(255, 160, 96, .75)";
+  context.lineWidth = 3;
+  context.beginPath();
+  context.arc(548, 423, 80, 0, Math.PI * 2);
   context.stroke();
 
   context.fillStyle = "#566b73";
@@ -112,7 +124,7 @@ export default function Home() {
   const [processing, setProcessing] = useState(false);
   const [processingTime, setProcessingTime] = useState<number | null>(null);
   const [result, setResult] = useState(DEFAULT_RESULT);
-  const [resultLabel, setResultLabel] = useState("READY FOR ANALYSIS");
+  const [resultLabel, setResultLabel] = useState("SECURITY MONITOR READY");
   const [question, setQuestion] = useState("");
   const [remoteEnabled, setRemoteEnabled] = useState(false);
   const [remoteAnalyzing, setRemoteAnalyzing] = useState(false);
@@ -125,10 +137,10 @@ export default function Home() {
 
   const sceneDescription = useMemo(() => {
     if (sourceKind === "idle") {
-      return "Start the camera or upload an image to receive an automatic description of the scene.";
+      return "Start a camera or upload an image to monitor for people and supported potential hazards.";
     }
     if (processing && detections.length === 0) {
-      return "Scanning the scene for people, objects, and spatial context…";
+      return "Scanning for people and supported potential hazards…";
     }
     return describeScene(detections);
   }, [detections, processing, sourceKind]);
@@ -211,7 +223,7 @@ export default function Home() {
           presented,
           minimumConfidenceRef.current,
         );
-        setResultLabel("DETAILED SCENE DESCRIPTION");
+        setResultLabel("DETAILED SECURITY SUMMARY");
         setResult(describeScene(visible));
       }
     } catch (error) {
@@ -295,8 +307,8 @@ export default function Home() {
       setRawDetections([]);
       setImageUrl(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
-      setResultLabel("LIVE DETECTION");
-      setResult("Camera connected. On-device detections will update without uploading frames.");
+      setResultLabel("LIVE SECURITY MONITORING");
+      setResult("Security monitoring is active. People and supported potential hazards will be highlighted on-device.");
     }
   }, [camera]);
 
@@ -353,7 +365,7 @@ export default function Home() {
       setRawDetections([]);
       setProcessingTime(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
-      setResultLabel("IMAGE LOADED");
+      setResultLabel("SECURITY IMAGE LOADED");
       setResult("Analyzing the uploaded image locally. The file has not left this device.");
     },
     [camera],
@@ -364,7 +376,7 @@ export default function Home() {
       setRawDetections(demoDetections);
       setModelState("fallback");
       setProcessingTime(18);
-      setResultLabel("SIMULATED SCENE DESCRIPTION");
+      setResultLabel("SIMULATED SECURITY ALERT");
       setResult(describeScene(demoDetections));
       return;
     }
@@ -383,7 +395,7 @@ export default function Home() {
     setImageUrl(createDemoScene());
     setSourceKind("demo");
     setRawDetections([]);
-    setResultLabel("SCENE DESCRIPTION");
+    setResultLabel("SECURITY DEMO ALERT");
     setResult(describeScene(demoDetections));
   }, [camera]);
 
@@ -401,7 +413,7 @@ export default function Home() {
       if (sourceKind === "idle") {
         publishResult(
           "NO VISUAL SOURCE",
-          "Start the camera, upload an image, or load the demo scene before asking about it.",
+          "Start a camera, upload an image, or load the security demo before asking about it.",
         );
         return;
       }
@@ -461,7 +473,7 @@ export default function Home() {
       try {
         const remote = await requestRemoteAnalysis(
           imageDataUrl,
-          "Describe this scene briefly and cautiously.",
+          "Provide a cautious security summary. Report visible people and potential hazards without identifying anyone or inferring intent.",
         );
         const updated = { ...record, description: remote.answer };
         await historyStore.add(updated);
@@ -496,7 +508,7 @@ export default function Home() {
           <span className="brand-mark" aria-hidden="true"><Eye size={22} /></span>
           <span>
             <strong>SCENE<span>LENS</span></strong>
-            <small>REAL-TIME VISUAL ASSISTANCE</small>
+            <small>REAL-TIME SECURITY AWARENESS</small>
           </span>
         </a>
         <div className="topbar-center" aria-label="Privacy status">
@@ -509,19 +521,19 @@ export default function Home() {
           <span className={modelState === "ready" ? "is-online" : ""} />
           <div>
             <strong>{modelState === "ready" ? "ON-DEVICE MODEL READY" : "INITIALIZING VISION CORE"}</strong>
-            <small>{modelVariant} · COCO 80 classes</small>
+            <small>{modelVariant} · PEOPLE + SUPPORTED HAZARDS</small>
           </div>
         </div>
       </header>
 
       <div className="app-intro" id="top">
         <div>
-          <p className="eyebrow"><Radio size={13} /> VISUAL CONTEXT, WITHOUT THE GUESSWORK</p>
-          <h2>See what’s there. <span>Understand what matters.</span></h2>
+          <p className="eyebrow"><Radio size={13} /> PRIVATE, ON-DEVICE SECURITY MONITORING</p>
+          <h2>Monitor people. <span>Surface potential hazards.</span></h2>
         </div>
         <p>
-          SceneLens interprets common visible objects on-device and explains its
-          uncertainty—without identifying anyone in view.
+          SceneLens highlights people and a narrow set of potentially harmful
+          objects without identifying anyone or claiming intent.
         </p>
       </div>
 
@@ -579,8 +591,8 @@ export default function Home() {
       <HistoryPanel records={history} onDelete={(id) => void handleDeleteHistory(id)} onClear={() => void handleClearHistory()} />
 
       <footer className="footer">
-        <span><ShieldCheck size={15} /> Privacy-first visual assistance</span>
-        <p>SceneLens provides estimates, not facts. Verify consequential observations yourself.</p>
+        <span><ShieldCheck size={15} /> Privacy-first security awareness</span>
+        <p>Not an emergency system. No firearm, identity, or intent recognition. Always verify alerts yourself.</p>
       </footer>
     </main>
   );

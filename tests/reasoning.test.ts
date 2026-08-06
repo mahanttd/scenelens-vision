@@ -16,16 +16,16 @@ const person: Detection = {
   box: { x: 0.2, y: 0.1, width: 0.35, height: 0.8 },
 };
 
-test("estimates a small object near a hand region as possibly held", () => {
-  const cup: Detection = {
-    id: "cup-1",
-    label: "cup",
+test("estimates a potential hazard near a hand region as possibly held", () => {
+  const knife: Detection = {
+    id: "knife-1",
+    label: "knife",
     confidence: 0.88,
     box: { x: 0.48, y: 0.5, width: 0.08, height: 0.13 },
   };
-  const estimate = estimateHolding([person, cup]);
+  const estimate = estimateHolding([person, knife]);
   assert.ok(estimate);
-  assert.equal(estimate.object.label, "cup");
+  assert.equal(estimate.object.label, "knife");
   assert.ok(estimate.confidence >= 0.38 && estimate.confidence < 1);
 });
 
@@ -59,38 +59,41 @@ test("filters detections at the configured confidence boundary", () => {
   );
 });
 
-test("describes scene type, objects, and spatial position", () => {
-  const laptop: Detection = {
-    id: "laptop-1",
-    label: "laptop",
+test("describes people and potential hazards without inferring intent", () => {
+  const knife: Detection = {
+    id: "knife-1",
+    label: "knife",
     confidence: 0.91,
-    box: { x: 0.66, y: 0.58, width: 0.25, height: 0.2 },
+    box: { x: 0.76, y: 0.66, width: 0.08, height: 0.2 },
   };
-  const keyboard: Detection = {
-    id: "keyboard-1",
-    label: "keyboard",
-    confidence: 0.82,
-    box: { x: 0.38, y: 0.72, width: 0.3, height: 0.1 },
-  };
-  const description = describeScene([person, laptop, keyboard]);
-  assert.match(description, /workspace or study area/i);
+  const description = describeScene([person, knife]);
   assert.match(description, /one person/i);
-  assert.match(description, /laptop/i);
+  assert.match(description, /possible knife/i);
   assert.match(description, /lower right/i);
+  assert.match(description, /does not establish intent/i);
 });
 
-test("keeps lower-confidence bottles while rejecting weak person predictions", () => {
+test("suppresses ordinary objects while keeping hazards and strong person detections", () => {
   const bottle: Detection = {
     id: "bottle-low",
     label: "bottle",
     confidence: 0.18,
     box: { x: 0.4, y: 0.2, width: 0.16, height: 0.55 },
   };
+  const knife: Detection = {
+    id: "knife-low",
+    label: "knife",
+    confidence: 0.18,
+    box: { x: 0.44, y: 0.3, width: 0.07, height: 0.2 },
+  };
   const weakPerson = { ...person, id: "person-weak", confidence: 0.36 };
-  const visible = filterSceneDetections([bottle, weakPerson, person], 0.25);
+  const visible = filterSceneDetections(
+    [bottle, knife, weakPerson, person],
+    0.25,
+  );
   assert.deepEqual(
     visible.map((item) => item.id),
-    ["bottle-low", "person-1"],
+    ["knife-low", "person-1"],
   );
-  assert.equal(friendlyLabel("bottle"), "water bottle");
+  assert.equal(friendlyLabel("knife"), "possible knife");
 });

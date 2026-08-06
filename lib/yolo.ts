@@ -283,21 +283,9 @@ export const demoDetections: Detection[] = [
     box: { x: 0.18, y: 0.08, width: 0.35, height: 0.82 },
   },
   {
-    id: "demo-cup",
-    label: "cup",
-    confidence: 0.82,
-    box: { x: 0.43, y: 0.49, width: 0.1, height: 0.16 },
-  },
-  {
-    id: "demo-laptop",
-    label: "laptop",
-    confidence: 0.89,
-    box: { x: 0.58, y: 0.52, width: 0.3, height: 0.22 },
-  },
-  {
-    id: "demo-table",
-    label: "dining table",
-    confidence: 0.78,
-    box: { x: 0.05, y: 0.68, width: 0.9, height: 0.27 },
+    id: "demo-knife",
+    label: "knife",
+    confidence: 0.84,
+    box: { x: 0.42, y: 0.47, width: 0.08, height: 0.22 },
   },
 ];

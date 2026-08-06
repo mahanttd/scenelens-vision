@@ -17,39 +17,21 @@ const NON_HOLDABLE = new Set([
   "dining table",
 ]);
 
-const SMALL_OBJECT_LABELS = new Set([
-  "backpack",
-  "banana",
-  "baseball glove",
-  "book",
-  "bottle",
-  "bowl",
-  "cell phone",
-  "clock",
-  "cup",
-  "fork",
-  "handbag",
-  "keyboard",
+const POTENTIALLY_HARMFUL_LABELS = new Set([
+  "baseball bat",
   "knife",
-  "mouse",
-  "orange",
-  "remote",
   "scissors",
-  "spoon",
-  "sports ball",
-  "tie",
-  "toothbrush",
-  "vase",
-  "wine glass",
+]);
+
+const SECURITY_RELEVANT_LABELS = new Set([
+  "person",
+  ...POTENTIALLY_HARMFUL_LABELS,
 ]);
 
 const FRIENDLY_LABELS: Record<string, string> = {
-  bottle: "water bottle",
-  "cell phone": "phone",
-  "dining table": "table",
-  "potted plant": "plant",
-  "sports ball": "ball",
-  tv: "television",
+  "baseball bat": "possible impact object",
+  knife: "possible knife",
+  scissors: "possible scissors",
 };
 
 const area = (box: BoundingBox) => Math.max(0, box.width) * Math.max(0, box.height);
@@ -150,17 +132,8 @@ export function friendlyLabel(label: string) {
   return FRIENDLY_LABELS[label] ?? label;
 }
 
-function pluralize(label: string, count: number) {
-  if (count === 1) return label;
-  if (label === "person") return "people";
-  if (label.endsWith("s")) return label;
-  return `${label}s`;
-}
-
-function countPhrase(label: string, count: number) {
-  const quantity =
-    count === 1 ? (/^[aeiou]/i.test(label) ? "an" : "a") : String(count);
-  return `${quantity} ${pluralize(label, count)}`;
+export function isPotentiallyHarmfulObject(label: string) {
+  return POTENTIALLY_HARMFUL_LABELS.has(label);
 }
 
 function positionPhrase(box: BoundingBox) {
@@ -175,87 +148,26 @@ function positionPhrase(box: BoundingBox) {
   return `in the ${vertical} ${horizontal}`;
 }
 
-function inferSetting(labels: Set<string>) {
-  const scores = [
-    {
-      name: "workspace or study area",
-      labels: ["laptop", "keyboard", "mouse", "book", "cell phone", "chair"],
-    },
-    {
-      name: "kitchen or dining area",
-      labels: ["refrigerator", "oven", "microwave", "sink", "dining table", "bowl", "cup"],
-    },
-    {
-      name: "road or parking area",
-      labels: ["car", "truck", "bus", "motorcycle", "traffic light", "stop sign"],
-    },
-    {
-      name: "living area",
-      labels: ["couch", "tv", "chair", "potted plant"],
-    },
-    { name: "bedroom", labels: ["bed", "clock", "book"] },
-    {
-      name: "bathroom",
-      labels: ["toilet", "sink", "toothbrush", "hair drier"],
-    },
-  ]
-    .map((candidate) => ({
-      name: candidate.name,
-      score: candidate.labels.filter((label) => labels.has(label)).length,
-    }))
-    .sort((a, b) => b.score - a.score);
-  return scores[0]?.score >= 2 ? scores[0].name : null;
-}
-
 export function describeScene(detections: Detection[]) {
   if (detections.length === 0) {
-    return "I can’t identify a common object with enough confidence yet. Try improving the lighting, moving closer, or lowering the confidence threshold slightly.";
+    return "No people or potentially harmful objects are confidently detected in the current view.";
   }
-
-  const groups = new Map<string, Detection[]>();
-  for (const detection of detections) {
-    const group = groups.get(detection.label) ?? [];
-    group.push(detection);
-    groups.set(detection.label, group);
-  }
-  const setting = inferSetting(new Set(groups.keys()));
-  const rankedGroups = [...groups.entries()]
-    .sort(([, a], [, b]) => {
-      const importanceA =
-        Math.max(...a.map((item) => item.confidence)) +
-        Math.min(0.35, a.reduce((sum, item) => sum + area(item.box), 0));
-      const importanceB =
-        Math.max(...b.map((item) => item.confidence)) +
-        Math.min(0.35, b.reduce((sum, item) => sum + area(item.box), 0));
-      return importanceB - importanceA;
-    })
-    .slice(0, 6);
-
-  const details = rankedGroups
-    .filter(([label]) => label !== "person")
-    .map(([label, items]) => {
-    const strongest = [...items].sort(
-      (a, b) => b.confidence - a.confidence,
-    )[0];
-    if (items.length > 2) {
-      return `${countPhrase(friendlyLabel(label), items.length)} spread across the scene`;
-    }
-    if (items.length === 2) {
-      return `${countPhrase(friendlyLabel(label), items.length)}, including one ${positionPhrase(strongest.box)}`;
-    }
-    return `${countPhrase(friendlyLabel(label), 1)} ${positionPhrase(strongest.box)}`;
-    });
-
-  const people = groups.get("person")?.length ?? 0;
-  const settingText = setting ? `This appears to be a ${setting}. ` : "";
+  const people = detections.filter((detection) => detection.label === "person");
+  const hazards = detections.filter((detection) =>
+    isPotentiallyHarmfulObject(detection.label),
+  );
   const peopleText =
-    people === 0
-      ? ""
-      : `${people === 1 ? "One person is" : `${people} people are`} visible. `;
-  const objectsText = details.length
-    ? `I can also see ${formatList(details)}.`
-    : "No other common objects are confidently recognized.";
-  return `${settingText}${peopleText}${objectsText}`.trim();
+    people.length === 0
+      ? "No people are confidently detected."
+      : `${people.length === 1 ? "One person is" : `${people.length} people are`} visible.`;
+  if (hazards.length === 0) {
+    return `${peopleText} No potentially harmful object is confidently detected.`;
+  }
+  const hazardDetails = hazards.slice(0, 4).map(
+    (hazard) =>
+      `${friendlyLabel(hazard.label)} ${positionPhrase(hazard.box)} (${Math.round(hazard.confidence * 100)}% confidence)`,
+  );
+  return `${peopleText} Review needed: ${formatList(hazardDetails)}. Detection does not establish intent.`;
 }
 
 export function describeHolding(detections: Detection[]) {
@@ -265,9 +177,9 @@ export function describeHolding(detections: Detection[]) {
   }
   const estimate = estimateHolding(detections);
   if (!estimate) {
-    return "A person is visible, but no nearby object has enough spatial evidence to call it held.";
+    return "A person is visible, but no potentially harmful object has enough spatial evidence to call it held.";
   }
-  return `The person is possibly holding ${articleFor(estimate.object.label)} ${estimate.object.label} — ${Math.round(estimate.confidence * 100)}% confidence.`;
+  return `A person may be holding ${articleFor(friendlyLabel(estimate.object.label))} ${friendlyLabel(estimate.object.label)} — ${Math.round(estimate.confidence * 100)}% spatial confidence. Review the live view; this does not establish intent.`;
 }
 
 function articleFor(label: string) {
@@ -319,19 +231,20 @@ export function countPeople(detections: Detection[]) {
 
 export function answerLocalQuestion(question: string, detections: Detection[]) {
   const normalized = question.toLowerCase();
-  if (/describe|what.*(?:see|visible)|scene/.test(normalized)) return describeScene(detections);
+  if (/describe|summary|security|hazard|harmful|danger|weapon|what.*(?:see|visible)/.test(normalized)) {
+    return describeScene(detections);
+  }
   if (/hold|carrying|carry/.test(normalized)) return describeHolding(detections);
   if (/how many|count/.test(normalized) && /people|person/.test(normalized)) {
     return countPeople(detections);
   }
-  if (/table|desk|surface/.test(normalized)) return describeTable(detections);
   const labels = [...new Set(detections.map((detection) => detection.label))];
   const mentioned = labels.find((label) => normalized.includes(label));
   if (mentioned) {
     const matches = detections.filter((detection) => detection.label === mentioned);
     return `I can see ${matches.length} ${mentioned}${matches.length === 1 ? "" : "s"}; the strongest detection is ${Math.round(Math.max(...matches.map((item) => item.confidence)) * 100)}% confident.`;
   }
-  return `${describeScene(detections)} I can only answer from the visible objects the on-device model recognizes.`;
+  return `${describeScene(detections)} I only report people and the supported potential-hazard classes.`;
 }
 
 export function filterByConfidence(
@@ -350,10 +263,10 @@ export function sceneConfidenceThreshold(
   if (label === "person") {
     return Math.max(0.38, baselineConfidence * 1.25);
   }
-  if (SMALL_OBJECT_LABELS.has(label)) {
+  if (POTENTIALLY_HARMFUL_LABELS.has(label)) {
     return Math.max(0.12, baselineConfidence * 0.62);
   }
-  return Math.max(0.16, baselineConfidence * 0.84);
+  return 1;
 }
 
 export function filterSceneDetections(
@@ -362,6 +275,7 @@ export function filterSceneDetections(
 ) {
   return detections.filter(
     (detection) =>
+      SECURITY_RELEVANT_LABELS.has(detection.label) &&
       detection.confidence >=
       sceneConfidenceThreshold(detection.label, baselineConfidence),
   );

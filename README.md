@@ -1,6 +1,6 @@
 # SceneLens
 
-SceneLens is a privacy-first, real-time AI camera assistant for everyday scenes. It runs a pretrained YOLOv8s accuracy model in the browser, draws stable labeled bounding boxes, automatically describes the scene, answers grounded questions about the current frame, estimates which nearby object a person may be holding, and narrates results.
+SceneLens is a privacy-first, real-time AI security-monitoring assistant. It runs a pretrained YOLOv8s model in the browser, highlights people and a narrow set of supported potential hazards, produces cautious security summaries, estimates whether a potential hazard may be near a person’s hand, and narrates results.
 
 The base application does not require a paid AI service. Camera frames and uploaded images remain in the browser for on-device inference. Optional remote vision verification occurs only after the user enables it and explicitly asks a question or captures a frame.
 
@@ -9,16 +9,16 @@ The base application does not require a paid AI service. Camera frames and uploa
 - Live camera access with a named webcam/device picker, quick cycling, start, stop, capture, permission errors, and image upload fallback
 - On-device YOLOv8s detection through ONNX Runtime Web with temporal stabilization, confidence filtering, bounding boxes, confidence scores, and timing telemetry
 - Periodic overlapping detail passes for better small-object detection in live video and uploads
-- Adaptive class thresholds that retain likely bottles, phones, cups, and other small objects while requiring stronger evidence for a person
-- Cautious person–object holding estimates based on an approximate hand region, object proximity, overlap, scale, and detector confidence
-- Automatic scene description with likely setting, object counts, spatial positions, person holding, table contents, visible people count, and custom questions
+- Security-only filtering that suppresses ordinary objects and retains people, possible knives, scissors, and baseball bats
+- Cautious person–hazard proximity estimates based on an approximate hand region, object proximity, overlap, scale, and detector confidence
+- Automatic security summaries with people counts, potential-hazard positions, review status, and custom questions
 - Browser speech synthesis with opt-in speech, replay, stop, and rate-limited automatic narration
 - Browser-local IndexedDB capture history with individual deletion, clear-all, and a 40-record cap
 - Explicit-only, server-side remote vision integration with MIME checks, size validation, rate limiting, timeouts, and guarded error messages
 - Simulated detection scene for development or camera-free exploration
 - Responsive keyboard-accessible dark HUD interface with reduced-motion support
 
-SceneLens never performs facial recognition and never identifies individuals.
+SceneLens never performs facial recognition, never identifies individuals, and never claims that a detected object establishes intent. The current COCO model does not detect firearms.
 
 ## Architecture
 
@@ -27,8 +27,8 @@ Camera / uploaded image
         │
         ├── Browser YOLOv8s + ONNX Runtime Web ──> stable detections + overlay
         │                                             │
-        │                                             ├── local scene reasoning
-        │                                             ├── holding estimate
+        │                                             ├── security-only filtering
+        │                                             ├── potential-hazard proximity estimate
         │                                             └── speech synthesis
         │
         ├── explicit capture ──> IndexedDB history on this device
@@ -41,7 +41,7 @@ Key modules:
 
 - `hooks/use-camera.ts`: media permission, stream lifecycle, camera discovery, named webcam selection, and switching
 - `lib/yolo.ts`: model loading, letterbox preprocessing, YOLO output parsing, and non-maximum suppression
-- `lib/reasoning.ts`: confidence filtering, descriptions, custom questions, and spatial holding estimates
+- `lib/reasoning.ts`: security-class filtering, cautious summaries, custom questions, and spatial proximity estimates
 - `hooks/use-speech.ts`: speech synthesis and replay controls
 - `lib/history-store.ts`: IndexedDB persistence and a memory adapter used by tests
 - `app/api/analyze/route.ts`: optional remote provider boundary and server-side safeguards
@@ -74,22 +74,22 @@ All three variables must be present for remote verification. They are never expo
 
 ## How the AI components work
 
-The browser loads the versioned YOLOv8s model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. If the accuracy model cannot initialize, SceneLens falls back to YOLOv8n. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, maps coordinates back to the displayed source, applies class-aware non-maximum suppression, stabilizes matching detections across frames, and uses adaptive thresholds to prioritize small everyday objects without accepting weak person predictions. Live video receives periodic overlapping detail passes; uploaded images receive the same two detail passes in addition to full-frame analysis. Frames are never sent continuously to a server.
+The browser loads the versioned YOLOv8s model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. If the accuracy model cannot initialize, SceneLens falls back to YOLOv8n. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, maps coordinates back to the displayed source, applies class-aware non-maximum suppression, stabilizes matching detections across frames, then suppresses everything except people and the supported potential-hazard classes. Live video receives periodic overlapping detail passes; uploaded images receive the same two detail passes in addition to full-frame analysis. Frames are never sent continuously to a server.
 
-YOLOv8s recognizes common COCO objects. It does not understand every item, activity, relationship, or subtle visual detail. Grounded descriptions report supported detections, counts, positions, and cautiously inferred scene types.
+YOLOv8s recognizes common COCO objects, but the interface intentionally reports only people, knives, scissors, and baseball bats. It does not recognize firearms, understand intent, or cover every hazardous object. Security summaries report only supported detections, counts, positions, and uncertainty.
 
 When remote verification is enabled, an explicit analysis action captures a resized JPEG (maximum 960 px on its longest side) and sends it to the server route. The route accepts JPEG, PNG, and WebP data URLs up to 5 MB, limits each client to eight requests per minute, applies a 15-second provider timeout, and instructs the provider to avoid identity claims and certified safety conclusions.
 
-## How “person holding object” is estimated
+## How “person near a potential hazard” is estimated
 
-For every detected person, SceneLens approximates left and right hand regions at the outer mid-torso. Candidate objects must be reasonably small and near the person’s interaction zone. A score combines:
+For every detected person, SceneLens approximates left and right hand regions at the outer mid-torso. Supported potential-hazard candidates must be reasonably small and near the person’s interaction zone. A score combines:
 
 - distance from the candidate object’s center to the nearest estimated hand point;
 - overlap with the person bounding box;
 - object detection confidence; and
 - whether the object has a plausible size for holding.
 
-Large non-holdable classes such as vehicles, beds, couches, and tables are excluded. Low scores produce no holding claim. Successful results use “possibly” and display an estimated confidence. This is spatial inference—not hand-pose tracking—and can be wrong when people overlap, hands are hidden, or the camera angle is unusual.
+Ordinary objects are excluded. Low scores produce no proximity claim. Successful results use cautious language and display an estimated spatial confidence. This is not hand-pose tracking and can be wrong when people overlap, hands are hidden, or the camera angle is unusual.
 
 ## Privacy and safety limitations
 
@@ -97,6 +97,9 @@ Large non-holdable classes such as vehicles, beds, couches, and tables are exclu
 - Uploads also remain local unless remote verification is both enabled and explicitly requested.
 - Captures are stored in browser IndexedDB on the current device; deleting browser storage removes them.
 - SceneLens has no facial-recognition or person-identification feature.
+- The current model does not detect firearms, smoke, fire, explosives, or many other hazards.
+- A possible knife, scissors, or baseball bat detection does not establish intent or danger.
+- SceneLens is not an emergency, alarm, or certified security system and must not replace human review or emergency response.
 - Model detections can be biased, incomplete, or incorrect. Low light, occlusion, blur, distance, and unfamiliar objects reduce accuracy.
 - General-purpose object detection cannot establish intent, verify identity, or reliably interpret subtle conditions that fall outside its training classes.
 
@@ -109,7 +112,7 @@ npm run test:render
 npm run test:e2e
 ```
 
-Unit coverage includes holding logic, confidence boundaries, local history behavior, input validation, and remote API errors. The render test verifies the deployed worker output. The Playwright end-to-end test opens the application, uploads a generated PNG test image, and requests a local scene description without camera access.
+Unit coverage includes hazard filtering, spatial proximity logic, confidence boundaries, local history behavior, input validation, and remote API errors. The render test verifies the deployed worker output. The Playwright end-to-end test opens the application, uploads a generated PNG test image, and requests a local security summary without camera access.
 
 The first Playwright run may require:
 
@@ -130,8 +133,8 @@ Camera access requires HTTPS on a deployed domain. The first on-device analysis 
 
 ## Future improvements
 
-- Add a dedicated hand-pose model to improve holding estimates
-- Add opt-in specialist models for domains that need object classes beyond the general COCO set
+- Add a dedicated, evaluated security-object model for firearm and broader hazard coverage
+- Add a hand-pose model to improve person–hazard proximity estimates
 - Move inference to a Web Worker and enable WebGPU when browser support is dependable
 - Add model integrity verification and managed model-version updates
 - Add encrypted export/import for local history

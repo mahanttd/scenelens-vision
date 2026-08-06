@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 
 test("opens SceneLens and analyzes an uploaded image without a camera", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Scene viewport" })).toBeVisible();
-  await expect(page.getByText("YOLO ready", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Security viewport" })).toBeVisible();
+  await expect(page.getByText("Security model ready", { exact: true })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("scene-description")).toContainText(
-    "Start the camera or upload an image",
+    "Start a camera or upload an image",
   );
 
   const tinyPng = Buffer.from(
@@ -20,8 +20,8 @@ test("opens SceneLens and analyzes an uploaded image without a camera", async ({
     mimeType: "image/png",
     buffer: tinyPng,
   });
-  await expect(page.getByAltText("Uploaded scene for analysis")).toBeVisible();
-  await page.getByRole("button", { name: "Describe the scene" }).click();
+  await expect(page.getByAltText("Uploaded frame for security review")).toBeVisible();
+  await page.getByRole("button", { name: "Security summary" }).click();
   await expect(page.getByTestId("analysis-result")).toContainText("ON-DEVICE ANALYSIS");
-  await expect(page.getByTestId("analysis-result")).toContainText("confidence");
+  await expect(page.getByTestId("analysis-result")).toContainText("No people or potentially harmful objects");
 });

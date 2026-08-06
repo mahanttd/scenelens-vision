@@ -536,6 +536,16 @@ button:disabled {
   background: #b2e4cc;
 }
 
+.detection-box--hazard {
+  border-color: var(--danger);
+  box-shadow: 0 0 20px rgba(255, 113, 105, 0.24), inset 0 0 22px rgba(255, 113, 105, 0.04);
+}
+
+.detection-box--hazard > span {
+  color: #1d0605;
+  background: var(--danger);
+}
+
 .scan-indicator {
   position: absolute;
   z-index: 15;
@@ -844,6 +854,22 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: 1.58;
 }
 
+.scene-summary-card.is-alert {
+  border-color: rgba(255, 113, 105, 0.52);
+  background:
+    linear-gradient(115deg, rgba(255, 113, 105, 0.12), transparent 62%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.scene-summary-card.is-alert::after {
+  background: var(--danger);
+  box-shadow: 0 0 14px rgba(255, 113, 105, 0.48);
+}
+
+.scene-summary-card.is-alert .scene-summary-card__header {
+  color: #ffaaa5;
+}
+
 .result-card {
   position: relative;
   overflow: hidden;
@@ -1121,6 +1147,16 @@ input[type="range"]::-webkit-slider-thumb {
   display: block;
   height: 100%;
   background: var(--cyan);
+}
+
+.security-limit {
+  margin: 11px 0 0;
+  border: 1px solid rgba(255, 113, 105, 0.2);
+  padding: 8px 9px;
+  color: #c79894;
+  background: rgba(255, 113, 105, 0.035);
+  font-size: 8px;
+  line-height: 1.5;
 }
 
 .history-shell {

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- IndexedDB data URLs cannot use the image optimizer */
 
 import { Clock3, ImageIcon, Trash2 } from "lucide-react";
+import { friendlyLabel } from "../lib/reasoning";
 import type { HistoryRecord } from "../lib/types";
 
 export function HistoryPanel({
@@ -18,9 +19,9 @@ export function HistoryPanel({
     <section className="history-shell" aria-labelledby="history-heading">
       <div className="history-heading">
         <div>
-          <p className="eyebrow">DEVICE-LOCAL LOG</p>
-          <h2 id="history-heading">Detection history</h2>
-          <p>Captured frames are stored only in this browser, up to 40 records.</p>
+          <p className="eyebrow">DEVICE-LOCAL SECURITY LOG</p>
+          <h2 id="history-heading">Security event history</h2>
+          <p>Captured review frames stay in this browser, up to 40 records.</p>
         </div>
         <button
           className="button button--ghost"
@@ -36,15 +37,15 @@ export function HistoryPanel({
         <div className="history-empty">
           <ImageIcon size={24} />
           <div>
-            <strong>No saved captures</strong>
-            <p>Use Capture when a useful scene is in view.</p>
+            <strong>No saved security events</strong>
+            <p>Use Capture when a person or potential hazard needs review.</p>
           </div>
         </div>
       ) : (
         <div className="history-grid">
           {records.map((record) => (
             <article className="history-card" key={record.id}>
-              <img src={record.imageDataUrl} alt="Locally saved captured scene" />
+              <img src={record.imageDataUrl} alt="Locally saved security review frame" />
               <div className="history-card__body">
                 <div className="history-time">
                   <Clock3 size={13} />
@@ -61,7 +62,7 @@ export function HistoryPanel({
                 <div className="history-tags">
                   {[...new Set(record.objects.map((item) => item.label))]
                     .slice(0, 5)
-                    .map((label) => <span key={label}>{label}</span>)}
+                    .map((label) => <span key={label}>{friendlyLabel(label)}</span>)}
                 </div>
               </div>
               <button

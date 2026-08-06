@@ -14,7 +14,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { friendlyLabel } from "../lib/reasoning";
+import { friendlyLabel, isPotentiallyHarmfulObject } from "../lib/reasoning";
 import type { Detection } from "../lib/types";
 
 type Props = {
@@ -40,9 +40,9 @@ type Props = {
 };
 
 const quickQuestions = [
-  { label: "Describe the scene", prompt: "Describe the scene", icon: Sparkles },
-  { label: "What are they holding?", prompt: "What is the person holding?", icon: Search },
-  { label: "What’s on the table?", prompt: "What is on the table?", icon: ListTree },
+  { label: "Security summary", prompt: "Give me a security summary", icon: Sparkles },
+  { label: "Potential hazards?", prompt: "Are any potential hazards visible?", icon: Search },
+  { label: "Is anyone holding one?", prompt: "Is a person holding a potential hazard?", icon: ListTree },
   { label: "Count visible people", prompt: "Count the visible people", icon: Users },
 ];
 
@@ -67,6 +67,9 @@ export function AnalysisPanel({
   onReplay,
   onStopSpeech,
 }: Props) {
+  const hazardCount = detections.filter((detection) =>
+    isPotentiallyHarmfulObject(detection.label),
+  ).length;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (question.trim()) onAsk(question.trim());
@@ -76,8 +79,8 @@ export function AnalysisPanel({
     <aside className="analysis-shell" aria-labelledby="analysis-heading">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">SCENE INTELLIGENCE</p>
-          <h2 id="analysis-heading">Evidence, interpreted</h2>
+          <p className="eyebrow">SECURITY INTELLIGENCE</p>
+          <h2 id="analysis-heading">People and potential hazards</h2>
         </div>
         <span className={`analysis-orb ${analyzing ? "is-active" : ""}`} aria-hidden="true" />
       </div>
@@ -87,13 +90,13 @@ export function AnalysisPanel({
       </div>
 
       <section
-        className="scene-summary-card"
+        className={`scene-summary-card ${hazardCount ? "is-alert" : ""}`}
         aria-labelledby="scene-summary-heading"
         data-testid="scene-description"
       >
         <div className="scene-summary-card__header">
-          <span id="scene-summary-heading"><ScanSearch size={15} /> LIVE SCENE DESCRIPTION</span>
-          <span>Auto-updating</span>
+          <span id="scene-summary-heading"><ScanSearch size={15} /> LIVE SECURITY SUMMARY</span>
+          <span>{hazardCount ? `${hazardCount} REVIEW` : "MONITORING"}</span>
         </div>
         <p>{sceneDescription}</p>
       </section>
@@ -124,7 +127,7 @@ export function AnalysisPanel({
         </div>
       </div>
 
-      <div className="quick-grid" aria-label="Quick scene questions">
+      <div className="quick-grid" aria-label="Quick security questions">
         {quickQuestions.map(({ label, prompt, icon: Icon }) => (
           <button type="button" key={prompt} onClick={() => onAsk(prompt)} disabled={analyzing}>
             <Icon size={16} />
@@ -134,14 +137,14 @@ export function AnalysisPanel({
       </div>
 
       <form className="question-form" onSubmit={submit}>
-        <label htmlFor="scene-question">Ask about this frame</label>
+        <label htmlFor="scene-question">Ask about this security frame</label>
         <div>
           <input
             id="scene-question"
             value={question}
             onChange={(event) => onQuestionChange(event.target.value)}
             maxLength={500}
-            placeholder="Is there a bottle near the laptop?"
+            placeholder="Is anyone near a potential hazard?"
           />
           <button type="submit" aria-label="Ask SceneLens" disabled={analyzing || !question.trim()}>
             <Mic2 size={17} />
@@ -152,14 +155,14 @@ export function AnalysisPanel({
       <div className="settings-stack">
         <div className="toggle-row">
           <span>
-            <strong>Remote vision verification</strong>
+            <strong>Remote security review</strong>
             <small>Only after you ask or capture · optional provider</small>
           </span>
           <button
             className="switch-button"
             type="button"
             role="switch"
-            aria-label="Remote vision verification"
+            aria-label="Remote security review"
             aria-checked={remoteEnabled}
             onClick={() => onRemoteEnabledChange(!remoteEnabled)}
           >
@@ -187,11 +190,11 @@ export function AnalysisPanel({
 
       <div className="object-readout">
         <div className="section-label">
-          <span>OBJECT READOUT</span>
-          <span>{detections.length} TRACKED · OBJECT BOOST ON</span>
+          <span>SECURITY READOUT</span>
+          <span>{detections.length} RELEVANT · {hazardCount} REVIEW</span>
         </div>
         {detections.length === 0 ? (
-          <p className="empty-copy">Objects above the confidence threshold will appear here.</p>
+          <p className="empty-copy">No people or supported potential hazards are above the confidence threshold.</p>
         ) : (
           detections.slice(0, 8).map((detection) => (
             <div className="object-row" key={detection.id}>
@@ -203,6 +206,9 @@ export function AnalysisPanel({
             </div>
           ))
         )}
+        <p className="security-limit">
+          Scope: people, possible knives, scissors, and baseball bats. This model does not detect firearms, identity, or intent and must not replace emergency response.
+        </p>
       </div>
     </aside>
   );

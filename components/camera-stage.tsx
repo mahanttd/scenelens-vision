@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, RefObject } from "react";
 import type { CameraOption, CameraState } from "../hooks/use-camera";
-import { friendlyLabel } from "../lib/reasoning";
+import { friendlyLabel, isPotentiallyHarmfulObject } from "../lib/reasoning";
 import type { Detection, ModelState, SourceKind } from "../lib/types";
 import { StatusPill } from "./status-pill";
 
@@ -47,8 +47,8 @@ type Props = {
 };
 
 function modelLabel(state: ModelState) {
-  if (state === "loading") return "Loading YOLO";
-  if (state === "ready") return "YOLO ready";
+  if (state === "loading") return "Loading security model";
+  if (state === "ready") return "Security model ready";
   if (state === "error") return "Model unavailable";
   if (state === "fallback") return "Demo detections";
   return "Model standby";
@@ -88,8 +88,8 @@ export function CameraStage({
     <section className="camera-shell" aria-labelledby="camera-heading">
       <div className="panel-heading camera-heading-row">
         <div>
-          <p className="eyebrow">LIVE OPTICAL FEED</p>
-          <h1 id="camera-heading">Scene viewport</h1>
+          <p className="eyebrow">LIVE SECURITY FEED</p>
+          <h1 id="camera-heading">Security viewport</h1>
         </div>
         <div className="status-cluster" aria-label="System status">
           <StatusPill tone={live ? "cyan" : cameraState === "error" ? "danger" : "neutral"}>
@@ -117,7 +117,7 @@ export function CameraStage({
             ref={imageRef}
             className={sourceKind === "upload" || sourceKind === "demo" ? "scene-media" : "scene-media is-hidden"}
             src={imageUrl}
-            alt={sourceKind === "demo" ? "Simulated workspace scene" : "Uploaded scene for analysis"}
+            alt={sourceKind === "demo" ? "Simulated security event" : "Uploaded frame for security review"}
             onLoad={onImageReady}
           />
         ) : null}
@@ -128,10 +128,10 @@ export function CameraStage({
               <ScanLine size={34} strokeWidth={1.4} />
             </div>
             <p className="viewport-kicker">AWAITING VISUAL INPUT</p>
-            <h2>Point SceneLens at the world</h2>
+            <h2>Monitor an area in real time</h2>
             <p>
               Camera frames stay on this device. Start a camera, upload an image,
-              or explore the simulated scene.
+              or explore the simulated security event.
             </p>
             <div className="empty-actions">
               <button className="button button--primary" onClick={onStart} type="button">
@@ -158,10 +158,10 @@ export function CameraStage({
         <span className="hud-corner hud-corner--br" aria-hidden="true" />
 
         {sourceReady ? (
-          <div className="detection-layer" aria-label={`${detections.length} detected objects`}>
+          <div className="detection-layer" aria-label={`${detections.length} security-relevant detections`}>
             {detections.map((detection, index) => (
               <div
-                className={`detection-box detection-box--${index % 3}`}
+                className={`detection-box detection-box--${index % 3} ${isPotentiallyHarmfulObject(detection.label) ? "detection-box--hazard" : ""}`}
                 key={detection.id}
                 style={{
                   left: `${detection.box.x * 100}%`,
@@ -186,7 +186,7 @@ export function CameraStage({
 
         {sourceReady ? (
           <div className="viewport-telemetry" aria-label="Frame telemetry">
-            <span>OBJECTS {String(detections.length).padStart(2, "0")}</span>
+            <span>RELEVANT {String(detections.length).padStart(2, "0")}</span>
             <span>{processingTime === null ? "-- MS" : `${processingTime} MS`}</span>
             <span title={activeCameraLabel}>
               {sourceKind === "camera"
@@ -218,7 +218,7 @@ export function CameraStage({
           className="icon-button"
           onClick={onSwitch}
           type="button"
-          aria-label="Switch between front and rear camera"
+          aria-label="Cycle connected cameras"
           disabled={!live || !canSwitch}
         >
           <RefreshCw size={18} />
@@ -244,7 +244,7 @@ export function CameraStage({
           onChange={onUpload}
         />
         <button className="demo-button" onClick={onLoadDemo} type="button">
-          <Sparkles size={16} /> Demo scene
+          <Sparkles size={16} /> Security demo
         </button>
       </div>
 
@@ -279,10 +279,10 @@ export function CameraStage({
 
       <div className="confidence-control">
         <div>
-          <span className="control-label">SMART DETECTION SENSITIVITY</span>
+          <span className="control-label">SECURITY DETECTION SENSITIVITY</span>
           <span className="control-value">{Math.round(confidence * 100)}%</span>
         </div>
-        <small>Small-object boost is on · people require stronger evidence</small>
+        <small>Potential-hazard classes are prioritized · people require stronger evidence</small>
         <input
           aria-label="Smart detection sensitivity"
           type="range"
