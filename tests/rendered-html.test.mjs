@@ -22,6 +22,7 @@ test("server-renders the SceneLens application shell", async () => {
   assert.match(html, /REAL-TIME VISUAL ASSISTANCE/);
   assert.match(html, /NO FACIAL RECOGNITION/);
   assert.match(html, /Ask about this frame/);
+  assert.match(html, /CAMERA SOURCE/);
   assert.doesNotMatch(html, /aerospace|aircraft|airworthiness/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });

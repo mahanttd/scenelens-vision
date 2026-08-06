@@ -6,7 +6,7 @@ The base application does not require a paid AI service. Camera frames and uploa
 
 ## Features
 
-- Live camera access with start, stop, front/rear switching, capture, permission errors, and image upload fallback
+- Live camera access with a named webcam/device picker, quick cycling, start, stop, capture, permission errors, and image upload fallback
 - On-device YOLOv8s detection through ONNX Runtime Web with temporal stabilization, confidence filtering, bounding boxes, confidence scores, and timing telemetry
 - Periodic overlapping detail passes for better small-object detection in live video and uploads
 - Adaptive class thresholds that retain likely bottles, phones, cups, and other small objects while requiring stronger evidence for a person
@@ -39,7 +39,7 @@ Camera / uploaded image
 
 Key modules:
 
-- `hooks/use-camera.ts`: media permission, stream lifecycle, and camera switching
+- `hooks/use-camera.ts`: media permission, stream lifecycle, camera discovery, named webcam selection, and switching
 - `lib/yolo.ts`: model loading, letterbox preprocessing, YOLO output parsing, and non-maximum suppression
 - `lib/reasoning.ts`: confidence filtering, descriptions, custom questions, and spatial holding estimates
 - `hooks/use-speech.ts`: speech synthesis and replay controls

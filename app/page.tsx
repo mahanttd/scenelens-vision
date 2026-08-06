@@ -308,6 +308,25 @@ export default function Home() {
     setProcessingTime(null);
   }, [camera]);
 
+  const handleCameraChange = useCallback(
+    async (deviceId: string) => {
+      const label =
+        camera.devices.find((device) => device.deviceId === deviceId)?.label ??
+        "selected webcam";
+      const started = await camera.selectCamera(deviceId);
+      if (!started) return;
+      setSourceKind("camera");
+      trackerRef.current.reset();
+      lastDetailInferenceRef.current = performance.now() - 3_200;
+      setRawDetections([]);
+      setImageUrl(null);
+      setProcessingTime(null);
+      setResultLabel("CAMERA CHANGED");
+      setResult(`${label} is now active. Real-time AI detection is running.`);
+    },
+    [camera],
+  );
+
   const handleUpload = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -521,9 +540,13 @@ export default function Home() {
           confidence={minimumConfidence}
           canSwitch={camera.canSwitch}
           facingMode={camera.facingMode}
+          cameraDevices={camera.devices}
+          selectedCameraId={camera.selectedDeviceId}
+          activeCameraLabel={camera.activeDeviceLabel}
           onStart={() => void handleStart()}
           onStop={handleStop}
           onSwitch={() => void camera.switchCamera()}
+          onCameraChange={(deviceId) => void handleCameraChange(deviceId)}
           onCapture={() => void handleCapture()}
           onUpload={handleUpload}
           onLoadDemo={handleDemo}

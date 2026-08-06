@@ -10,9 +10,10 @@ import {
   RefreshCw,
   ScanLine,
   Sparkles,
+  Video,
 } from "lucide-react";
 import type { ChangeEvent, RefObject } from "react";
-import type { CameraState } from "../hooks/use-camera";
+import type { CameraOption, CameraState } from "../hooks/use-camera";
 import { friendlyLabel } from "../lib/reasoning";
 import type { Detection, ModelState, SourceKind } from "../lib/types";
 import { StatusPill } from "./status-pill";
@@ -31,9 +32,13 @@ type Props = {
   confidence: number;
   canSwitch: boolean;
   facingMode: "user" | "environment";
+  cameraDevices: CameraOption[];
+  selectedCameraId: string;
+  activeCameraLabel: string;
   onStart: () => void;
   onStop: () => void;
   onSwitch: () => void;
+  onCameraChange: (deviceId: string) => void;
   onCapture: () => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onLoadDemo: () => void;
@@ -63,9 +68,13 @@ export function CameraStage({
   confidence,
   canSwitch,
   facingMode,
+  cameraDevices,
+  selectedCameraId,
+  activeCameraLabel,
   onStart,
   onStop,
   onSwitch,
+  onCameraChange,
   onCapture,
   onUpload,
   onLoadDemo,
@@ -179,7 +188,11 @@ export function CameraStage({
           <div className="viewport-telemetry" aria-label="Frame telemetry">
             <span>OBJECTS {String(detections.length).padStart(2, "0")}</span>
             <span>{processingTime === null ? "-- MS" : `${processingTime} MS`}</span>
-            <span>{sourceKind === "camera" ? facingMode.toUpperCase() : sourceKind.toUpperCase()}</span>
+            <span title={activeCameraLabel}>
+              {sourceKind === "camera"
+                ? (activeCameraLabel || facingMode).toUpperCase()
+                : sourceKind.toUpperCase()}
+            </span>
           </div>
         ) : null}
       </div>
@@ -233,6 +246,35 @@ export function CameraStage({
         <button className="demo-button" onClick={onLoadDemo} type="button">
           <Sparkles size={16} /> Demo scene
         </button>
+      </div>
+
+      <div className="camera-source-control">
+        <label htmlFor="camera-source-select">
+          <Video size={15} />
+          <span>
+            <strong>CAMERA SOURCE</strong>
+            <small>
+              {cameraDevices.length
+                ? "Choose an integrated or USB webcam"
+                : "Start the camera once to reveal available webcams"}
+            </small>
+          </span>
+        </label>
+        <select
+          id="camera-source-select"
+          value={selectedCameraId}
+          disabled={cameraState === "requesting" || cameraDevices.length === 0}
+          onChange={(event) => onCameraChange(event.target.value)}
+        >
+          {cameraDevices.length === 0 ? (
+            <option value="">No cameras listed yet</option>
+          ) : null}
+          {cameraDevices.map((device) => (
+            <option key={device.deviceId} value={device.deviceId}>
+              {device.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="confidence-control">

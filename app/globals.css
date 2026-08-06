@@ -648,6 +648,73 @@ label.icon-button {
   font-size: 10px;
 }
 
+.camera-source-control {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(220px, 1.25fr);
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.camera-source-control > label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  color: var(--cyan);
+}
+
+.camera-source-control > label > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.camera-source-control strong {
+  color: #bdd3d6;
+  font-family: var(--font-data);
+  font-size: 8px;
+  letter-spacing: 0.09em;
+}
+
+.camera-source-control small {
+  margin-top: 2px;
+  color: var(--subtle);
+  font-size: 8px;
+}
+
+.camera-source-control select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  padding: 0 34px 0 10px;
+  outline: none;
+  color: var(--text);
+  background: #0b171c;
+  font-size: 10px;
+}
+
+.camera-source-control select:focus {
+  border-color: rgba(69, 220, 224, 0.65);
+  box-shadow: 0 0 0 2px rgba(69, 220, 224, 0.08);
+}
+
+.camera-source-control select:disabled {
+  cursor: not-allowed;
+  color: var(--subtle);
+  opacity: 0.7;
+}
+
+.camera-source-control option {
+  color: var(--text);
+  background: #0b171c;
+}
+
 .confidence-control {
   display: grid;
   grid-template-columns: 155px 1fr;
@@ -1254,6 +1321,7 @@ input[type="range"]::-webkit-slider-thumb {
   .empty-actions .button { flex: 1; }
   .camera-controls { justify-content: flex-start; overflow-x: auto; }
   .capture-button { min-width: 102px; }
+  .camera-source-control { grid-template-columns: 1fr; gap: 9px; }
   .confidence-control { grid-template-columns: 1fr; gap: 10px; }
   .quick-grid { grid-template-columns: 1fr; }
   .history-heading { align-items: flex-start; flex-direction: column; }
