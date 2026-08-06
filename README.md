@@ -8,7 +8,8 @@ The base application does not require a paid AI service. Camera frames and uploa
 
 - Live camera access with start, stop, front/rear switching, capture, permission errors, and image upload fallback
 - On-device YOLOv8s detection through ONNX Runtime Web with temporal stabilization, confidence filtering, bounding boxes, confidence scores, and timing telemetry
-- High-detail overlapping image passes for better small-object detection in large uploads
+- Periodic overlapping detail passes for better small-object detection in live video and uploads
+- Adaptive class thresholds that retain likely bottles, phones, cups, and other small objects while requiring stronger evidence for a person
 - Cautious person–object holding estimates based on an approximate hand region, object proximity, overlap, scale, and detector confidence
 - Automatic scene description with likely setting, object counts, spatial positions, person holding, table contents, visible people count, and custom questions
 - Browser speech synthesis with opt-in speech, replay, stop, and rate-limited automatic narration
@@ -73,7 +74,7 @@ All three variables must be present for remote verification. They are never expo
 
 ## How the AI components work
 
-The browser loads the versioned YOLOv8s model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. If the accuracy model cannot initialize, SceneLens falls back to YOLOv8n. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, filters detections, maps coordinates back to the displayed source, applies class-aware non-maximum suppression, and stabilizes matching detections across frames. Large uploaded images receive two overlapping detail passes in addition to full-frame analysis. Live inference is throttled to roughly one pass every 700 ms and never sends continuous frames to a server.
+The browser loads the versioned YOLOv8s model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. If the accuracy model cannot initialize, SceneLens falls back to YOLOv8n. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, maps coordinates back to the displayed source, applies class-aware non-maximum suppression, stabilizes matching detections across frames, and uses adaptive thresholds to prioritize small everyday objects without accepting weak person predictions. Live video receives periodic overlapping detail passes; uploaded images receive the same two detail passes in addition to full-frame analysis. Frames are never sent continuously to a server.
 
 YOLOv8s recognizes common COCO objects. It does not understand every item, activity, relationship, or subtle visual detail. Grounded descriptions report supported detections, counts, positions, and cautiously inferred scene types.
 

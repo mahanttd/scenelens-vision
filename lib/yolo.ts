@@ -223,7 +223,7 @@ export class YoloDetector {
     if (!options.detailed) return fullFrame;
 
     const dimensions = sourceDimensions(source);
-    if (Math.min(dimensions.width, dimensions.height) < 720) return fullFrame;
+    if (Math.min(dimensions.width, dimensions.height) < 320) return fullFrame;
 
     const landscape = dimensions.width >= dimensions.height;
     const crops = landscape

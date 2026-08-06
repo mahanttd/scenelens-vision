@@ -652,9 +652,20 @@ label.icon-button {
   display: grid;
   grid-template-columns: 155px 1fr;
   align-items: center;
-  gap: 18px;
+  gap: 8px 18px;
   border-top: 1px solid var(--line);
   padding: 13px 2px 0;
+}
+
+.confidence-control > small {
+  color: var(--subtle);
+  font-size: 8px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.confidence-control > input {
+  grid-column: 1 / -1;
 }
 
 .confidence-control > div {

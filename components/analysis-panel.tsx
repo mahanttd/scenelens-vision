@@ -14,6 +14,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { FormEvent } from "react";
+import { friendlyLabel } from "../lib/reasoning";
 import type { Detection } from "../lib/types";
 
 type Props = {
@@ -187,14 +188,14 @@ export function AnalysisPanel({
       <div className="object-readout">
         <div className="section-label">
           <span>OBJECT READOUT</span>
-          <span>{detections.length} TRACKED</span>
+          <span>{detections.length} TRACKED · OBJECT BOOST ON</span>
         </div>
         {detections.length === 0 ? (
           <p className="empty-copy">Objects above the confidence threshold will appear here.</p>
         ) : (
           detections.slice(0, 8).map((detection) => (
             <div className="object-row" key={detection.id}>
-              <span>{detection.label}</span>
+              <span>{friendlyLabel(detection.label)}</span>
               <div className="confidence-meter" aria-hidden="true">
                 <span style={{ width: `${detection.confidence * 100}%` }} />
               </div>

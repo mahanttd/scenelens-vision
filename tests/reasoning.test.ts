@@ -4,6 +4,8 @@ import {
   describeScene,
   estimateHolding,
   filterByConfidence,
+  filterSceneDetections,
+  friendlyLabel,
 } from "../lib/reasoning";
 import type { Detection } from "../lib/types";
 
@@ -75,4 +77,20 @@ test("describes scene type, objects, and spatial position", () => {
   assert.match(description, /one person/i);
   assert.match(description, /laptop/i);
   assert.match(description, /lower right/i);
+});
+
+test("keeps lower-confidence bottles while rejecting weak person predictions", () => {
+  const bottle: Detection = {
+    id: "bottle-low",
+    label: "bottle",
+    confidence: 0.18,
+    box: { x: 0.4, y: 0.2, width: 0.16, height: 0.55 },
+  };
+  const weakPerson = { ...person, id: "person-weak", confidence: 0.36 };
+  const visible = filterSceneDetections([bottle, weakPerson, person], 0.25);
+  assert.deepEqual(
+    visible.map((item) => item.id),
+    ["bottle-low", "person-1"],
+  );
+  assert.equal(friendlyLabel("bottle"), "water bottle");
 });

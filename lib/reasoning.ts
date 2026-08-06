@@ -17,6 +17,41 @@ const NON_HOLDABLE = new Set([
   "dining table",
 ]);
 
+const SMALL_OBJECT_LABELS = new Set([
+  "backpack",
+  "banana",
+  "baseball glove",
+  "book",
+  "bottle",
+  "bowl",
+  "cell phone",
+  "clock",
+  "cup",
+  "fork",
+  "handbag",
+  "keyboard",
+  "knife",
+  "mouse",
+  "orange",
+  "remote",
+  "scissors",
+  "spoon",
+  "sports ball",
+  "tie",
+  "toothbrush",
+  "vase",
+  "wine glass",
+]);
+
+const FRIENDLY_LABELS: Record<string, string> = {
+  bottle: "water bottle",
+  "cell phone": "phone",
+  "dining table": "table",
+  "potted plant": "plant",
+  "sports ball": "ball",
+  tv: "television",
+};
+
 const area = (box: BoundingBox) => Math.max(0, box.width) * Math.max(0, box.height);
 
 export function intersectionOverUnion(a: BoundingBox, b: BoundingBox) {
@@ -111,6 +146,10 @@ function formatList(items: string[]) {
   return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
+export function friendlyLabel(label: string) {
+  return FRIENDLY_LABELS[label] ?? label;
+}
+
 function pluralize(label: string, count: number) {
   if (count === 1) return label;
   if (label === "person") return "people";
@@ -199,12 +238,12 @@ export function describeScene(detections: Detection[]) {
       (a, b) => b.confidence - a.confidence,
     )[0];
     if (items.length > 2) {
-      return `${countPhrase(label, items.length)} spread across the scene`;
+      return `${countPhrase(friendlyLabel(label), items.length)} spread across the scene`;
     }
     if (items.length === 2) {
-      return `${countPhrase(label, items.length)}, including one ${positionPhrase(strongest.box)}`;
+      return `${countPhrase(friendlyLabel(label), items.length)}, including one ${positionPhrase(strongest.box)}`;
     }
-    return `${countPhrase(label, 1)} ${positionPhrase(strongest.box)}`;
+    return `${countPhrase(friendlyLabel(label), 1)} ${positionPhrase(strongest.box)}`;
     });
 
   const people = groups.get("person")?.length ?? 0;
@@ -301,5 +340,29 @@ export function filterByConfidence(
 ) {
   return detections.filter(
     (detection) => detection.confidence >= minimumConfidence,
+  );
+}
+
+export function sceneConfidenceThreshold(
+  label: string,
+  baselineConfidence: number,
+) {
+  if (label === "person") {
+    return Math.max(0.38, baselineConfidence * 1.25);
+  }
+  if (SMALL_OBJECT_LABELS.has(label)) {
+    return Math.max(0.12, baselineConfidence * 0.62);
+  }
+  return Math.max(0.16, baselineConfidence * 0.84);
+}
+
+export function filterSceneDetections(
+  detections: Detection[],
+  baselineConfidence: number,
+) {
+  return detections.filter(
+    (detection) =>
+      detection.confidence >=
+      sceneConfidenceThreshold(detection.label, baselineConfidence),
   );
 }

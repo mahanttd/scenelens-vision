@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, RefObject } from "react";
 import type { CameraState } from "../hooks/use-camera";
+import { friendlyLabel } from "../lib/reasoning";
 import type { Detection, ModelState, SourceKind } from "../lib/types";
 import { StatusPill } from "./status-pill";
 
@@ -161,7 +162,7 @@ export function CameraStage({
                 }}
               >
                 <span>
-                  {detection.label} {Math.round(detection.confidence * 100)}%
+                  {friendlyLabel(detection.label)} {Math.round(detection.confidence * 100)}%
                 </span>
               </div>
             ))}
@@ -236,14 +237,15 @@ export function CameraStage({
 
       <div className="confidence-control">
         <div>
-          <span className="control-label">MINIMUM CONFIDENCE</span>
+          <span className="control-label">SMART DETECTION SENSITIVITY</span>
           <span className="control-value">{Math.round(confidence * 100)}%</span>
         </div>
+        <small>Small-object boost is on · people require stronger evidence</small>
         <input
-          aria-label="Minimum detection confidence"
+          aria-label="Smart detection sensitivity"
           type="range"
-          min="0.2"
-          max="0.8"
+          min="0.15"
+          max="0.65"
           step="0.05"
           value={confidence}
           onChange={(event) => onConfidenceChange(Number(event.target.value))}

@@ -20,7 +20,7 @@ import {
   answerLocalQuestion,
   describeHolding,
   describeScene,
-  filterByConfidence,
+  filterSceneDetections,
 } from "../lib/reasoning";
 import { requestRemoteAnalysis } from "../lib/remote-analysis";
 import type { Detection, HistoryRecord, ModelState, SourceKind } from "../lib/types";
@@ -95,9 +95,10 @@ export default function Home() {
   const trackerRef = useRef(new DetectionTracker());
   const inferenceBusyRef = useRef(false);
   const lastInferenceRef = useRef(0);
+  const lastDetailInferenceRef = useRef(0);
   const lastNarrationRef = useRef(0);
   const objectUrlRef = useRef<string | null>(null);
-  const minimumConfidenceRef = useRef(0.3);
+  const minimumConfidenceRef = useRef(0.25);
   const historyStore = useMemo(() => getHistoryStore(), []);
 
   const camera = useCamera(videoRef);
@@ -105,7 +106,7 @@ export default function Home() {
   const [sourceKind, setSourceKind] = useState<SourceKind>("idle");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<Detection[]>([]);
-  const [minimumConfidence, setMinimumConfidence] = useState(0.3);
+  const [minimumConfidence, setMinimumConfidence] = useState(0.25);
   const [modelState, setModelState] = useState<ModelState>("loading");
   const [modelVariant, setModelVariant] = useState("YOLOv8s accuracy model");
   const [processing, setProcessing] = useState(false);
@@ -118,7 +119,7 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryRecord[]>([]);
 
   const detections = useMemo(
-    () => filterByConfidence(rawDetections, minimumConfidence),
+    () => filterSceneDetections(rawDetections, minimumConfidence),
     [minimumConfidence, rawDetections],
   );
 
@@ -189,7 +190,7 @@ export default function Home() {
     setProcessing(true);
     const started = performance.now();
     try {
-      const found = await detector.detect(source, 0.14, {
+      const found = await detector.detect(source, 0.08, {
         detailed: options.detailed,
       });
       const presented = options.track
@@ -205,8 +206,8 @@ export default function Home() {
           : detector.modelName,
       );
       setModelState("ready");
-      if (options.detailed) {
-        const visible = filterByConfidence(
+      if (options.detailed && !options.track) {
+        const visible = filterSceneDetections(
           presented,
           minimumConfidenceRef.current,
         );
@@ -241,7 +242,13 @@ export default function Home() {
         !inferenceBusyRef.current
       ) {
         lastInferenceRef.current = timestamp;
-        void runDetection(video, { track: true });
+        const runDetailPass =
+          timestamp - lastDetailInferenceRef.current >= 3_200;
+        if (runDetailPass) lastDetailInferenceRef.current = timestamp;
+        void runDetection(video, {
+          track: true,
+          detailed: runDetailPass,
+        });
       }
       animationFrame = requestAnimationFrame(detectFrame);
     };
@@ -284,6 +291,7 @@ export default function Home() {
     if (started) {
       setSourceKind("camera");
       trackerRef.current.reset();
+      lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
       setImageUrl(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
