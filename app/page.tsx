@@ -14,6 +14,7 @@ import { CameraStage } from "../components/camera-stage";
 import { HistoryPanel } from "../components/history-panel";
 import { useCamera } from "../hooks/use-camera";
 import { useSpeech } from "../hooks/use-speech";
+import { ActivityMonitor } from "../lib/activity-monitor";
 import { DetectionTracker } from "../lib/detection-tracker";
 import { getHistoryStore } from "../lib/history-store";
 import {
@@ -23,11 +24,18 @@ import {
   filterSceneDetections,
 } from "../lib/reasoning";
 import { requestRemoteAnalysis } from "../lib/remote-analysis";
-import type { Detection, HistoryRecord, ModelState, SourceKind } from "../lib/types";
-import { demoDetections, YoloDetector } from "../lib/yolo";
+import { SecurityDetector } from "../lib/security-detector";
+import type {
+  ActivityAlert,
+  Detection,
+  HistoryRecord,
+  ModelState,
+  SourceKind,
+} from "../lib/types";
+import { demoDetections } from "../lib/yolo";
 
 const DEFAULT_RESULT =
-  "Choose a camera or image to monitor for people and supported potential hazards. SceneLens reports uncertainty and never infers identity or intent.";
+  "Choose a camera or image to monitor for people, possible firearms, and supported potential hazards. SceneLens reports uncertainty and never infers identity, suspicion, or intent.";
 
 function uniqueId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -102,9 +110,10 @@ function createDemoScene() {
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const detectorRef = useRef<YoloDetector | null>(null);
+  const detectorRef = useRef<SecurityDetector | null>(null);
   const detectorReadyRef = useRef(false);
   const trackerRef = useRef(new DetectionTracker());
+  const activityMonitorRef = useRef(new ActivityMonitor());
   const inferenceBusyRef = useRef(false);
   const lastInferenceRef = useRef(0);
   const lastDetailInferenceRef = useRef(0);
@@ -120,7 +129,7 @@ export default function Home() {
   const [rawDetections, setRawDetections] = useState<Detection[]>([]);
   const [minimumConfidence, setMinimumConfidence] = useState(0.25);
   const [modelState, setModelState] = useState<ModelState>("loading");
-  const [modelVariant, setModelVariant] = useState("YOLOv8s accuracy model");
+  const [modelVariant, setModelVariant] = useState("D-FINE-S security model");
   const [processing, setProcessing] = useState(false);
   const [processingTime, setProcessingTime] = useState<number | null>(null);
   const [result, setResult] = useState(DEFAULT_RESULT);
@@ -129,6 +138,7 @@ export default function Home() {
   const [remoteEnabled, setRemoteEnabled] = useState(false);
   const [remoteAnalyzing, setRemoteAnalyzing] = useState(false);
   const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const [activityAlerts, setActivityAlerts] = useState<ActivityAlert[]>([]);
 
   const detections = useMemo(
     () => filterSceneDetections(rawDetections, minimumConfidence),
@@ -150,7 +160,7 @@ export default function Home() {
   }, [minimumConfidence]);
 
   useEffect(() => {
-    const detector = new YoloDetector();
+    const detector = new SecurityDetector();
     detectorRef.current = detector;
     let active = true;
     detector
@@ -158,12 +168,14 @@ export default function Home() {
       .then(() => {
         if (!active) return;
         detectorReadyRef.current = true;
-        setModelVariant(
-          detector.modelName === "YOLOv8s"
-            ? "YOLOv8s accuracy model"
-            : detector.modelName,
-        );
+        setModelVariant(detector.modelName);
         setModelState("ready");
+        if (!detector.supportsFirearms) {
+          setResultLabel("MODEL NOTICE");
+          setResult(
+            "The general security model loaded, but its firearm class is unavailable. Check the connection and reload to restore firearm review alerts.",
+          );
+        }
       })
       .catch(() => {
         if (!active) return;
@@ -209,20 +221,34 @@ export default function Home() {
         ? trackerRef.current.update(found)
         : found;
       if (!options.track) trackerRef.current.reset();
+      const visible = filterSceneDetections(
+        presented,
+        minimumConfidenceRef.current,
+      );
+      if (options.track) {
+        const freshAlerts = activityMonitorRef.current.update(visible);
+        if (freshAlerts.length > 0) {
+          setActivityAlerts((current) => [
+            ...freshAlerts.toReversed(),
+            ...current,
+          ].slice(0, 6));
+          const reviewAlert = freshAlerts.find(
+            (alert) => alert.severity === "review",
+          );
+          if (reviewAlert) {
+            setResultLabel("OBJECTIVE ACTIVITY ALERT");
+            setResult(
+              `${reviewAlert.message} This is an observable-event alert, not a suspicion or intent judgment.`,
+            );
+          }
+        }
+      }
       setRawDetections(presented);
       setProcessingTime(Math.round(performance.now() - started));
       detectorReadyRef.current = true;
-      setModelVariant(
-        detector.modelName === "YOLOv8s"
-          ? "YOLOv8s accuracy model"
-          : detector.modelName,
-      );
+      setModelVariant(detector.modelName);
       setModelState("ready");
       if (options.detailed && !options.track) {
-        const visible = filterSceneDetections(
-          presented,
-          minimumConfidenceRef.current,
-        );
         setResultLabel("DETAILED SECURITY SUMMARY");
         setResult(describeScene(visible));
       }
@@ -303,6 +329,8 @@ export default function Home() {
     if (started) {
       setSourceKind("camera");
       trackerRef.current.reset();
+      activityMonitorRef.current.reset();
+      setActivityAlerts([]);
       lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
       setImageUrl(null);
@@ -315,6 +343,8 @@ export default function Home() {
   const handleStop = useCallback(() => {
     camera.stop();
     trackerRef.current.reset();
+    activityMonitorRef.current.reset();
+    setActivityAlerts([]);
     setSourceKind("idle");
     setRawDetections([]);
     setProcessingTime(null);
@@ -329,6 +359,8 @@ export default function Home() {
       if (!started) return;
       setSourceKind("camera");
       trackerRef.current.reset();
+      activityMonitorRef.current.reset();
+      setActivityAlerts([]);
       lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
       setImageUrl(null);
@@ -357,6 +389,8 @@ export default function Home() {
       }
       camera.stop();
       trackerRef.current.reset();
+      activityMonitorRef.current.reset();
+      setActivityAlerts([]);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const nextUrl = URL.createObjectURL(file);
       objectUrlRef.current = nextUrl;
@@ -388,6 +422,8 @@ export default function Home() {
   const handleDemo = useCallback(() => {
     camera.stop();
     trackerRef.current.reset();
+    activityMonitorRef.current.reset();
+    setActivityAlerts([]);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -529,11 +565,11 @@ export default function Home() {
       <div className="app-intro" id="top">
         <div>
           <p className="eyebrow"><Radio size={13} /> PRIVATE, ON-DEVICE SECURITY MONITORING</p>
-          <h2>Monitor people. <span>Surface potential hazards.</span></h2>
+          <h2>Monitor people. <span>Surface possible firearms and hazards.</span></h2>
         </div>
         <p>
-          SceneLens highlights people and a narrow set of potentially harmful
-          objects without identifying anyone or claiming intent.
+          SceneLens uses on-device AI to flag people, possible firearms, and a
+          narrow set of potential hazards without identifying anyone or judging suspicion.
         </p>
       </div>
 
@@ -569,6 +605,7 @@ export default function Home() {
           result={result}
           resultLabel={resultLabel}
           sceneDescription={sceneDescription}
+          activityAlerts={activityAlerts}
           analyzing={remoteAnalyzing}
           detections={detections}
           question={question}
@@ -592,7 +629,7 @@ export default function Home() {
 
       <footer className="footer">
         <span><ShieldCheck size={15} /> Privacy-first security awareness</span>
-        <p>Not an emergency system. No firearm, identity, or intent recognition. Always verify alerts yourself.</p>
+        <p>Not an emergency system. No identity, suspicion, or intent recognition. Possible-firearm alerts require human verification.</p>
       </footer>
     </main>
   );

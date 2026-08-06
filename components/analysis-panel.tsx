@@ -8,6 +8,7 @@ import {
   RefreshCcw,
   ScanSearch,
   Search,
+  ShieldAlert,
   Sparkles,
   Users,
   Volume2,
@@ -15,12 +16,13 @@ import {
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { friendlyLabel, isPotentiallyHarmfulObject } from "../lib/reasoning";
-import type { Detection } from "../lib/types";
+import type { ActivityAlert, Detection } from "../lib/types";
 
 type Props = {
   result: string;
   resultLabel: string;
   sceneDescription: string;
+  activityAlerts: ActivityAlert[];
   analyzing: boolean;
   detections: Detection[];
   question: string;
@@ -41,6 +43,7 @@ type Props = {
 
 const quickQuestions = [
   { label: "Security summary", prompt: "Give me a security summary", icon: Sparkles },
+  { label: "Possible firearm?", prompt: "Is a possible firearm visible?", icon: ShieldAlert },
   { label: "Potential hazards?", prompt: "Are any potential hazards visible?", icon: Search },
   { label: "Is anyone holding one?", prompt: "Is a person holding a potential hazard?", icon: ListTree },
   { label: "Count visible people", prompt: "Count the visible people", icon: Users },
@@ -50,6 +53,7 @@ export function AnalysisPanel({
   result,
   resultLabel,
   sceneDescription,
+  activityAlerts,
   analyzing,
   detections,
   question,
@@ -99,6 +103,29 @@ export function AnalysisPanel({
           <span>{hazardCount ? `${hazardCount} REVIEW` : "MONITORING"}</span>
         </div>
         <p>{sceneDescription}</p>
+      </section>
+
+      <section className="activity-card" aria-labelledby="activity-heading" data-testid="activity-alerts">
+        <div className="activity-card__header">
+          <span id="activity-heading"><ShieldAlert size={15} /> OBJECTIVE ACTIVITY</span>
+          <span>NO SUSPICION SCORE</span>
+        </div>
+        {activityAlerts.length === 0 ? (
+          <p className="activity-card__empty">
+            No activity events yet. SceneLens can report entry, time in view,
+            and proximity to a detected hazard.
+          </p>
+        ) : (
+          <div className="activity-list">
+            {activityAlerts.slice(0, 4).map((alert) => (
+              <div className={`activity-item activity-item--${alert.severity}`} key={alert.id}>
+                <span>{alert.type.replaceAll("-", " ")}</span>
+                <p>{alert.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <small>Based only on visible timing and geometry—not appearance, identity, intent, or emotion.</small>
       </section>
 
       <div className="result-card" aria-live="polite" data-testid="analysis-result">
@@ -207,7 +234,7 @@ export function AnalysisPanel({
           ))
         )}
         <p className="security-limit">
-          Scope: people, possible knives, scissors, and baseball bats. This model does not detect firearms, identity, or intent and must not replace emergency response.
+          Scope: people, possible firearms, knives, scissors, and baseball bats. AI can miss objects or confuse toys and tools; verify every alert and never use it as proof of intent.
         </p>
       </div>
     </aside>

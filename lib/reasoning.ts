@@ -19,6 +19,7 @@ const NON_HOLDABLE = new Set([
 
 const POTENTIALLY_HARMFUL_LABELS = new Set([
   "baseball bat",
+  "gun",
   "knife",
   "scissors",
 ]);
@@ -30,6 +31,7 @@ const SECURITY_RELEVANT_LABELS = new Set([
 
 const FRIENDLY_LABELS: Record<string, string> = {
   "baseball bat": "possible impact object",
+  gun: "possible firearm",
   knife: "possible knife",
   scissors: "possible scissors",
 };
@@ -231,6 +233,12 @@ export function countPeople(detections: Detection[]) {
 
 export function answerLocalQuestion(question: string, detections: Detection[]) {
   const normalized = question.toLowerCase();
+  if (/firearm|gun/.test(normalized)) {
+    const firearms = detections.filter((detection) => detection.label === "gun");
+    return firearms.length === 0
+      ? "No possible firearm is confidently detected in the current frame. A missed detection is still possible, so verify the live view."
+      : `${firearms.length === 1 ? "One possible firearm is" : `${firearms.length} possible firearms are`} detected; the strongest detection is ${Math.round(Math.max(...firearms.map((item) => item.confidence)) * 100)}% confident. Treat this as a review alert, not proof.`;
+  }
   if (/describe|summary|security|hazard|harmful|danger|weapon|what.*(?:see|visible)/.test(normalized)) {
     return describeScene(detections);
   }
@@ -262,6 +270,9 @@ export function sceneConfidenceThreshold(
 ) {
   if (label === "person") {
     return Math.max(0.38, baselineConfidence * 1.25);
+  }
+  if (label === "gun") {
+    return Math.max(0.3, baselineConfidence);
   }
   if (POTENTIALLY_HARMFUL_LABELS.has(label)) {
     return Math.max(0.12, baselineConfidence * 0.62);

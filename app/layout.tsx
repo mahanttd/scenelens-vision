@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 const description =
-  "Private, on-device security monitoring for people and supported potential hazards.";
+  "Private, on-device AI monitoring for people, possible firearms, and supported potential hazards.";
 
 export const metadata: Metadata = {
   title: "SceneLens — Real-time AI security monitoring",

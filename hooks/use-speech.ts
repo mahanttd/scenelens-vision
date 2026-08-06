@@ -1,13 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+
+const subscribeToSpeechSupport = () => () => {};
+const readSpeechSupport = () => "speechSynthesis" in window;
+const readServerSpeechSupport = () => false;
 
 export function useSpeech() {
   const [enabled, setEnabled] = useState(false);
   const [autoNarrate, setAutoNarrate] = useState(false);
   const [lastSpoken, setLastSpoken] = useState("");
   const [speaking, setSpeaking] = useState(false);
-  const supported = typeof window !== "undefined" && "speechSynthesis" in window;
+  const supported = useSyncExternalStore(
+    subscribeToSpeechSupport,
+    readSpeechSupport,
+    readServerSpeechSupport,
+  );
 
   const stop = useCallback(() => {
     if (!supported) return;
@@ -50,4 +58,3 @@ export function useSpeech() {
     canReplay: Boolean(lastSpoken),
   };
 }
-

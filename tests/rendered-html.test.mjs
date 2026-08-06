@@ -21,7 +21,9 @@ test("server-renders the SceneLens application shell", async () => {
   assert.match(html, /<title>SceneLens/);
   assert.match(html, /REAL-TIME SECURITY AWARENESS/);
   assert.match(html, /SECURITY INTELLIGENCE/);
-  assert.match(html, /does not detect firearms, identity, or intent/i);
+  assert.match(html, /possible firearms, knives, scissors, and baseball bats/i);
+  assert.match(html, /NO SUSPICION SCORE/);
+  assert.match(html, /Possible-firearm alerts require human verification/i);
   assert.match(html, /NO FACIAL RECOGNITION/);
   assert.match(html, /Ask about this security frame/);
   assert.match(html, /CAMERA SOURCE/);

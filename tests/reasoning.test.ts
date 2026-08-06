@@ -97,3 +97,18 @@ test("suppresses ordinary objects while keeping hazards and strong person detect
   );
   assert.equal(friendlyLabel("knife"), "possible knife");
 });
+
+test("keeps possible firearm detections at a cautious confidence threshold", () => {
+  const weakGun: Detection = {
+    id: "gun-weak",
+    label: "gun",
+    confidence: 0.29,
+    box: { x: 0.4, y: 0.4, width: 0.1, height: 0.12 },
+  };
+  const reviewedGun = { ...weakGun, id: "gun-reviewed", confidence: 0.31 };
+  assert.deepEqual(
+    filterSceneDetections([weakGun, reviewedGun], 0.25).map((item) => item.id),
+    ["gun-reviewed"],
+  );
+  assert.equal(friendlyLabel("gun"), "possible firearm");
+});
