@@ -149,6 +149,8 @@ export class YoloDetector {
     this.loading = (async () => {
       const ort = await import("onnxruntime-web/wasm");
       ort.env.wasm.numThreads = 1;
+      ort.env.wasm.wasmPaths =
+        "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/";
       this.session = await ort.InferenceSession.create(MODEL_PATH, {
         executionProviders: ["wasm"],
         graphOptimizationLevel: "all",

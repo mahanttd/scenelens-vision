@@ -11,6 +11,18 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
+const externalOrtWasm = {
+  name: "external-ort-wasm",
+  apply: "build" as const,
+  generateBundle(_options: unknown, bundle: Record<string, unknown>) {
+    for (const assetName of Object.keys(bundle)) {
+      if (assetName.includes("ort-wasm") && assetName.endsWith(".wasm")) {
+        delete bundle[assetName];
+      }
+    }
+  },
+};
+
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
@@ -52,6 +64,7 @@ export default defineConfig(async () => {
     plugins: [
       vinext(),
       sites(),
+      externalOrtWasm,
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
