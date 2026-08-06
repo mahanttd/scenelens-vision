@@ -140,14 +140,14 @@ function parseOutput(
 }
 
 export class YoloDetector {
-  private session: import("onnxruntime-web").InferenceSession | null = null;
+  private session: import("onnxruntime-web/wasm").InferenceSession | null = null;
   private loading: Promise<void> | null = null;
 
   async load() {
     if (this.session) return;
     if (this.loading) return this.loading;
     this.loading = (async () => {
-      const ort = await import("onnxruntime-web");
+      const ort = await import("onnxruntime-web/wasm");
       ort.env.wasm.numThreads = 1;
       this.session = await ort.InferenceSession.create(MODEL_PATH, {
         executionProviders: ["wasm"],
@@ -164,7 +164,7 @@ export class YoloDetector {
   async detect(source: CanvasImageSource, minimumConfidence: number) {
     await this.load();
     if (!this.session) throw new Error("YOLO session did not initialize");
-    const ort = await import("onnxruntime-web");
+    const ort = await import("onnxruntime-web/wasm");
     const frame = prepareInput(source);
     const input = new ort.Tensor("float32", frame.tensorData, [
       1,
@@ -213,4 +213,3 @@ export const demoDetections: Detection[] = [
     box: { x: 0.05, y: 0.68, width: 0.9, height: 0.27 },
   },
 ];
-
