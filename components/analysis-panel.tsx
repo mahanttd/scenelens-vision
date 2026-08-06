@@ -6,6 +6,7 @@ import {
   ListTree,
   Mic2,
   RefreshCcw,
+  ScanSearch,
   Search,
   Sparkles,
   Users,
@@ -18,6 +19,7 @@ import type { Detection } from "../lib/types";
 type Props = {
   result: string;
   resultLabel: string;
+  sceneDescription: string;
   analyzing: boolean;
   detections: Detection[];
   question: string;
@@ -46,6 +48,7 @@ const quickQuestions = [
 export function AnalysisPanel({
   result,
   resultLabel,
+  sceneDescription,
   analyzing,
   detections,
   question,
@@ -81,6 +84,18 @@ export function AnalysisPanel({
       <div className="privacy-strip">
         <span className="status-dot" /> Live detection stays on this device
       </div>
+
+      <section
+        className="scene-summary-card"
+        aria-labelledby="scene-summary-heading"
+        data-testid="scene-description"
+      >
+        <div className="scene-summary-card__header">
+          <span id="scene-summary-heading"><ScanSearch size={15} /> LIVE SCENE DESCRIPTION</span>
+          <span>Auto-updating</span>
+        </div>
+        <p>{sceneDescription}</p>
+      </section>
 
       <div className="result-card" aria-live="polite" data-testid="analysis-result">
         <div className="result-card__header">

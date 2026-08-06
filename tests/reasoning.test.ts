@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  describeScene,
   estimateHolding,
   filterByConfidence,
 } from "../lib/reasoning";
@@ -56,3 +57,22 @@ test("filters detections at the configured confidence boundary", () => {
   );
 });
 
+test("describes scene type, objects, and spatial position", () => {
+  const laptop: Detection = {
+    id: "laptop-1",
+    label: "laptop",
+    confidence: 0.91,
+    box: { x: 0.66, y: 0.58, width: 0.25, height: 0.2 },
+  };
+  const keyboard: Detection = {
+    id: "keyboard-1",
+    label: "keyboard",
+    confidence: 0.82,
+    box: { x: 0.38, y: 0.72, width: 0.3, height: 0.1 },
+  };
+  const description = describeScene([person, laptop, keyboard]);
+  assert.match(description, /workspace or study area/i);
+  assert.match(description, /one person/i);
+  assert.match(description, /laptop/i);
+  assert.match(description, /lower right/i);
+});

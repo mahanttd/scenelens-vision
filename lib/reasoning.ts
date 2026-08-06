@@ -111,27 +111,112 @@ function formatList(items: string[]) {
   return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
+function pluralize(label: string, count: number) {
+  if (count === 1) return label;
+  if (label === "person") return "people";
+  if (label.endsWith("s")) return label;
+  return `${label}s`;
+}
+
+function countPhrase(label: string, count: number) {
+  const quantity =
+    count === 1 ? (/^[aeiou]/i.test(label) ? "an" : "a") : String(count);
+  return `${quantity} ${pluralize(label, count)}`;
+}
+
+function positionPhrase(box: BoundingBox) {
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+  const horizontal = centerX < 0.34 ? "left" : centerX > 0.66 ? "right" : "center";
+  const vertical = centerY < 0.34 ? "upper" : centerY > 0.66 ? "lower" : "middle";
+  if (area(box) > 0.38) return "across much of the view";
+  if (horizontal === "center" && vertical === "middle") return "near the center";
+  if (horizontal === "center") return `in the ${vertical} part of the view`;
+  if (vertical === "middle") return `on the ${horizontal}`;
+  return `in the ${vertical} ${horizontal}`;
+}
+
+function inferSetting(labels: Set<string>) {
+  const scores = [
+    {
+      name: "workspace or study area",
+      labels: ["laptop", "keyboard", "mouse", "book", "cell phone", "chair"],
+    },
+    {
+      name: "kitchen or dining area",
+      labels: ["refrigerator", "oven", "microwave", "sink", "dining table", "bowl", "cup"],
+    },
+    {
+      name: "road or parking area",
+      labels: ["car", "truck", "bus", "motorcycle", "traffic light", "stop sign"],
+    },
+    {
+      name: "living area",
+      labels: ["couch", "tv", "chair", "potted plant"],
+    },
+    { name: "bedroom", labels: ["bed", "clock", "book"] },
+    {
+      name: "bathroom",
+      labels: ["toilet", "sink", "toothbrush", "hair drier"],
+    },
+  ]
+    .map((candidate) => ({
+      name: candidate.name,
+      score: candidate.labels.filter((label) => labels.has(label)).length,
+    }))
+    .sort((a, b) => b.score - a.score);
+  return scores[0]?.score >= 2 ? scores[0].name : null;
+}
+
 export function describeScene(detections: Detection[]) {
   if (detections.length === 0) {
-    return "I can’t identify a common object with enough confidence in this frame. The view may be dark, obstructed, or outside the model’s training set.";
+    return "I can’t identify a common object with enough confidence yet. Try improving the lighting, moving closer, or lowering the confidence threshold slightly.";
   }
-  const people = detections.filter((detection) => detection.label === "person");
-  const labels = [
-    ...new Set(
-      detections
-        .filter((detection) => detection.label !== "person")
-        .sort((a, b) => b.confidence - a.confidence)
-        .map((detection) => detection.label),
-    ),
-  ].slice(0, 5);
+
+  const groups = new Map<string, Detection[]>();
+  for (const detection of detections) {
+    const group = groups.get(detection.label) ?? [];
+    group.push(detection);
+    groups.set(detection.label, group);
+  }
+  const setting = inferSetting(new Set(groups.keys()));
+  const rankedGroups = [...groups.entries()]
+    .sort(([, a], [, b]) => {
+      const importanceA =
+        Math.max(...a.map((item) => item.confidence)) +
+        Math.min(0.35, a.reduce((sum, item) => sum + area(item.box), 0));
+      const importanceB =
+        Math.max(...b.map((item) => item.confidence)) +
+        Math.min(0.35, b.reduce((sum, item) => sum + area(item.box), 0));
+      return importanceB - importanceA;
+    })
+    .slice(0, 6);
+
+  const details = rankedGroups
+    .filter(([label]) => label !== "person")
+    .map(([label, items]) => {
+    const strongest = [...items].sort(
+      (a, b) => b.confidence - a.confidence,
+    )[0];
+    if (items.length > 2) {
+      return `${countPhrase(label, items.length)} spread across the scene`;
+    }
+    if (items.length === 2) {
+      return `${countPhrase(label, items.length)}, including one ${positionPhrase(strongest.box)}`;
+    }
+    return `${countPhrase(label, 1)} ${positionPhrase(strongest.box)}`;
+    });
+
+  const people = groups.get("person")?.length ?? 0;
+  const settingText = setting ? `This appears to be a ${setting}. ` : "";
   const peopleText =
-    people.length === 0
-      ? "No people are confidently detected."
-      : `${people.length} ${people.length === 1 ? "person is" : "people are"} visible.`;
-  const objectText = labels.length
-    ? ` Nearby objects may include ${formatList(labels)}.`
-    : "";
-  return `${peopleText}${objectText} This description is based only on visible object detections.`;
+    people === 0
+      ? ""
+      : `${people === 1 ? "One person is" : `${people} people are`} visible. `;
+  const objectsText = details.length
+    ? `I can also see ${formatList(details)}.`
+    : "No other common objects are confidently recognized.";
+  return `${settingText}${peopleText}${objectsText}`.trim();
 }
 
 export function describeHolding(detections: Detection[]) {

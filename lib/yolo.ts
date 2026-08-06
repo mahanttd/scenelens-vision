@@ -1,7 +1,9 @@
 import type { Detection } from "./types";
 
 const MODEL_SIZE = 640;
-const MODEL_PATH =
+const ACCURACY_MODEL_PATH =
+  "https://huggingface.co/cabelo/yolov8/resolve/main/yolov8s.onnx";
+const FAST_MODEL_PATH =
   "https://huggingface.co/cabelo/yolov8/resolve/main/yolov8n.onnx";
 
 const COCO_LABELS = [
@@ -50,7 +52,9 @@ function prepareInput(source: CanvasImageSource) {
   const drawHeight = dimensions.height * scale;
   const padX = (MODEL_SIZE - drawWidth) / 2;
   const padY = (MODEL_SIZE - drawHeight) / 2;
-  context.fillStyle = "#727272";
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.fillStyle = "rgb(114, 114, 114)";
   context.fillRect(0, 0, MODEL_SIZE, MODEL_SIZE);
   context.drawImage(source, padX, padY, drawWidth, drawHeight);
   const pixels = context.getImageData(0, 0, MODEL_SIZE, MODEL_SIZE).data;
@@ -74,17 +78,17 @@ function iou(a: Detection, b: Detection) {
   return union > 0 ? intersection / union : 0;
 }
 
-function nonMaximumSuppression(detections: Detection[]) {
+export function nonMaximumSuppression(detections: Detection[]) {
   const selected: Detection[] = [];
   for (const candidate of detections.sort((a, b) => b.confidence - a.confidence)) {
     if (
       selected.every(
-        (item) => item.label !== candidate.label || iou(item, candidate) < 0.45,
+        (item) => item.label !== candidate.label || iou(item, candidate) < 0.5,
       )
     ) {
       selected.push(candidate);
     }
-    if (selected.length >= 30) break;
+    if (selected.length >= 50) break;
   }
   return selected;
 }
@@ -143,19 +147,37 @@ function parseOutput(
 export class YoloDetector {
   private session: import("onnxruntime-web/wasm").InferenceSession | null = null;
   private loading: Promise<void> | null = null;
+  private activeModel = "YOLOv8s";
+
+  get modelName() {
+    return this.activeModel;
+  }
 
   async load() {
     if (this.session) return;
     if (this.loading) return this.loading;
     this.loading = (async () => {
       const ort = await import("onnxruntime-web/wasm");
-      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.numThreads =
+        globalThis.crossOriginIsolated && typeof navigator !== "undefined"
+          ? Math.min(4, navigator.hardwareConcurrency || 1)
+          : 1;
       ort.env.wasm.wasmPaths =
         "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/";
-      this.session = await ort.InferenceSession.create(MODEL_PATH, {
-        executionProviders: ["wasm"],
-        graphOptimizationLevel: "all",
-      });
+      const options = {
+        executionProviders: ["wasm"] as const,
+        graphOptimizationLevel: "all" as const,
+      };
+      try {
+        this.session = await ort.InferenceSession.create(
+          ACCURACY_MODEL_PATH,
+          options,
+        );
+        this.activeModel = "YOLOv8s";
+      } catch {
+        this.session = await ort.InferenceSession.create(FAST_MODEL_PATH, options);
+        this.activeModel = "YOLOv8n fallback";
+      }
     })();
     try {
       await this.loading;
@@ -164,7 +186,10 @@ export class YoloDetector {
     }
   }
 
-  async detect(source: CanvasImageSource, minimumConfidence: number) {
+  private async detectSingle(
+    source: CanvasImageSource,
+    minimumConfidence: number,
+  ) {
     await this.load();
     if (!this.session) throw new Error("YOLO session did not initialize");
     const ort = await import("onnxruntime-web/wasm");
@@ -187,6 +212,66 @@ export class YoloDetector {
       minimumConfidence,
       frame,
     );
+  }
+
+  async detect(
+    source: CanvasImageSource,
+    minimumConfidence: number,
+    options: { detailed?: boolean } = {},
+  ) {
+    const fullFrame = await this.detectSingle(source, minimumConfidence);
+    if (!options.detailed) return fullFrame;
+
+    const dimensions = sourceDimensions(source);
+    if (Math.min(dimensions.width, dimensions.height) < 720) return fullFrame;
+
+    const landscape = dimensions.width >= dimensions.height;
+    const crops = landscape
+      ? [
+          { x: 0, y: 0, width: 0.58, height: 1 },
+          { x: 0.42, y: 0, width: 0.58, height: 1 },
+        ]
+      : [
+          { x: 0, y: 0, width: 1, height: 0.58 },
+          { x: 0, y: 0.42, width: 1, height: 0.58 },
+        ];
+
+    const detailDetections: Detection[] = [];
+    for (const [cropIndex, crop] of crops.entries()) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(dimensions.width * crop.width);
+      canvas.height = Math.round(dimensions.height * crop.height);
+      const context = canvas.getContext("2d");
+      if (!context) continue;
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(
+        source,
+        dimensions.width * crop.x,
+        dimensions.height * crop.y,
+        dimensions.width * crop.width,
+        dimensions.height * crop.height,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
+      const detections = await this.detectSingle(canvas, minimumConfidence);
+      detailDetections.push(
+        ...detections.map((detection) => ({
+          ...detection,
+          id: `${detection.label}-detail-${cropIndex}-${detection.id}`,
+          box: {
+            x: crop.x + detection.box.x * crop.width,
+            y: crop.y + detection.box.y * crop.height,
+            width: detection.box.width * crop.width,
+            height: detection.box.height * crop.height,
+          },
+        })),
+      );
+    }
+
+    return nonMaximumSuppression([...fullFrame, ...detailDetections]);
   }
 }
 

@@ -3,7 +3,10 @@ import { expect, test } from "@playwright/test";
 test("opens SceneLens and analyzes an uploaded image without a camera", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Scene viewport" })).toBeVisible();
-  await expect(page.getByText("YOLO ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("YOLO ready", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("scene-description")).toContainText(
+    "Start the camera or upload an image",
+  );
 
   const tinyPng = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",

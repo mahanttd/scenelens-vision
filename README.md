@@ -1,15 +1,16 @@
 # SceneLens
 
-SceneLens is a privacy-first, real-time AI camera assistant for everyday scenes. It runs a pretrained YOLOv8n object detector in the browser, draws labeled bounding boxes, answers grounded questions about the current frame, estimates which nearby object a person may be holding, and narrates results.
+SceneLens is a privacy-first, real-time AI camera assistant for everyday scenes. It runs a pretrained YOLOv8s accuracy model in the browser, draws stable labeled bounding boxes, automatically describes the scene, answers grounded questions about the current frame, estimates which nearby object a person may be holding, and narrates results.
 
 The base application does not require a paid AI service. Camera frames and uploaded images remain in the browser for on-device inference. Optional remote vision verification occurs only after the user enables it and explicitly asks a question or captures a frame.
 
 ## Features
 
 - Live camera access with start, stop, front/rear switching, capture, permission errors, and image upload fallback
-- On-device YOLOv8n detection through ONNX Runtime Web with throttled inference, confidence filtering, bounding boxes, confidence scores, and timing telemetry
+- On-device YOLOv8s detection through ONNX Runtime Web with temporal stabilization, confidence filtering, bounding boxes, confidence scores, and timing telemetry
+- High-detail overlapping image passes for better small-object detection in large uploads
 - Cautious person–object holding estimates based on an approximate hand region, object proximity, overlap, scale, and detector confidence
-- Scene description, person holding, table contents, visible people count, and custom questions
+- Automatic scene description with likely setting, object counts, spatial positions, person holding, table contents, visible people count, and custom questions
 - Browser speech synthesis with opt-in speech, replay, stop, and rate-limited automatic narration
 - Browser-local IndexedDB capture history with individual deletion, clear-all, and a 40-record cap
 - Explicit-only, server-side remote vision integration with MIME checks, size validation, rate limiting, timeouts, and guarded error messages
@@ -23,7 +24,7 @@ SceneLens never performs facial recognition and never identifies individuals.
 ```text
 Camera / uploaded image
         │
-        ├── Browser YOLOv8n + ONNX Runtime Web ──> detections + overlay
+        ├── Browser YOLOv8s + ONNX Runtime Web ──> stable detections + overlay
         │                                             │
         │                                             ├── local scene reasoning
         │                                             ├── holding estimate
@@ -72,9 +73,9 @@ All three variables must be present for remote verification. They are never expo
 
 ## How the AI components work
 
-The browser loads the versioned YOLOv8n model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, filters detections, maps coordinates back to the displayed source, and applies class-aware non-maximum suppression. Live inference is throttled to roughly one pass every 700 ms and never sends continuous frames to a server.
+The browser loads the versioned YOLOv8s model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. If the accuracy model cannot initialize, SceneLens falls back to YOLOv8n. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, filters detections, maps coordinates back to the displayed source, applies class-aware non-maximum suppression, and stabilizes matching detections across frames. Large uploaded images receive two overlapping detail passes in addition to full-frame analysis. Live inference is throttled to roughly one pass every 700 ms and never sends continuous frames to a server.
 
-YOLOv8n recognizes common COCO objects. It does not understand every item, activity, relationship, or subtle visual detail. Rule-based descriptions report only supported detections and explicitly state uncertainty.
+YOLOv8s recognizes common COCO objects. It does not understand every item, activity, relationship, or subtle visual detail. Grounded descriptions report supported detections, counts, positions, and cautiously inferred scene types.
 
 When remote verification is enabled, an explicit analysis action captures a resized JPEG (maximum 960 px on its longest side) and sends it to the server route. The route accepts JPEG, PNG, and WebP data URLs up to 5 MB, limits each client to eight requests per minute, applies a 15-second provider timeout, and instructs the provider to avoid identity claims and certified safety conclusions.
 
@@ -124,11 +125,11 @@ npm run start
 
 The project uses the Sites-compatible Vinext/Vite worker structure and produces Cloudflare Worker-compatible ESM output. For Sites hosting, configure optional environment values as hosted secrets, save a version from the pushed source commit, and deploy that saved version. Leave the environment unset for an on-device-only deployment.
 
-Camera access requires HTTPS on a deployed domain. The first on-device analysis needs network access to fetch the 12.8 MB model and version-pinned WebAssembly runtime; subsequent behavior depends on the browser cache.
+Camera access requires HTTPS on a deployed domain. The first on-device analysis needs network access to fetch the 44.8 MB accuracy model and version-pinned WebAssembly runtime; subsequent behavior depends on the browser cache.
 
 ## Future improvements
 
-- Add a dedicated hand-pose model and temporal tracking to improve holding estimates
+- Add a dedicated hand-pose model to improve holding estimates
 - Add opt-in specialist models for domains that need object classes beyond the general COCO set
 - Move inference to a Web Worker and enable WebGPU when browser support is dependable
 - Add model integrity verification and managed model-version updates
@@ -138,4 +139,4 @@ Camera access requires HTTPS on a deployed domain. The first on-device analysis 
 
 ## Model attribution
 
-The included YOLOv8n ONNX asset is sourced from the [cabelo/yolov8 model repository](https://huggingface.co/cabelo/yolov8/blob/main/yolov8n.onnx), which identifies the model license as CreativeML Open RAIL-M. Review both the model repository and upstream Ultralytics licensing before commercial redistribution.
+The YOLOv8s ONNX asset is sourced from the [cabelo/yolov8 model repository](https://huggingface.co/cabelo/yolov8/blob/main/yolov8s.onnx), which identifies the model license as CreativeML Open RAIL-M. Review both the model repository and upstream Ultralytics licensing before commercial redistribution.

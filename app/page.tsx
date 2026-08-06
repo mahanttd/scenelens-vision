@@ -14,6 +14,7 @@ import { CameraStage } from "../components/camera-stage";
 import { HistoryPanel } from "../components/history-panel";
 import { useCamera } from "../hooks/use-camera";
 import { useSpeech } from "../hooks/use-speech";
+import { DetectionTracker } from "../lib/detection-tracker";
 import { getHistoryStore } from "../lib/history-store";
 import {
   answerLocalQuestion,
@@ -91,10 +92,12 @@ export default function Home() {
   const imageRef = useRef<HTMLImageElement>(null);
   const detectorRef = useRef<YoloDetector | null>(null);
   const detectorReadyRef = useRef(false);
+  const trackerRef = useRef(new DetectionTracker());
   const inferenceBusyRef = useRef(false);
   const lastInferenceRef = useRef(0);
   const lastNarrationRef = useRef(0);
   const objectUrlRef = useRef<string | null>(null);
+  const minimumConfidenceRef = useRef(0.3);
   const historyStore = useMemo(() => getHistoryStore(), []);
 
   const camera = useCamera(videoRef);
@@ -102,8 +105,9 @@ export default function Home() {
   const [sourceKind, setSourceKind] = useState<SourceKind>("idle");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<Detection[]>([]);
-  const [minimumConfidence, setMinimumConfidence] = useState(0.35);
+  const [minimumConfidence, setMinimumConfidence] = useState(0.3);
   const [modelState, setModelState] = useState<ModelState>("loading");
+  const [modelVariant, setModelVariant] = useState("YOLOv8s accuracy model");
   const [processing, setProcessing] = useState(false);
   const [processingTime, setProcessingTime] = useState<number | null>(null);
   const [result, setResult] = useState(DEFAULT_RESULT);
@@ -118,6 +122,20 @@ export default function Home() {
     [minimumConfidence, rawDetections],
   );
 
+  const sceneDescription = useMemo(() => {
+    if (sourceKind === "idle") {
+      return "Start the camera or upload an image to receive an automatic description of the scene.";
+    }
+    if (processing && detections.length === 0) {
+      return "Scanning the scene for people, objects, and spatial context…";
+    }
+    return describeScene(detections);
+  }, [detections, processing, sourceKind]);
+
+  useEffect(() => {
+    minimumConfidenceRef.current = minimumConfidence;
+  }, [minimumConfidence]);
+
   useEffect(() => {
     const detector = new YoloDetector();
     detectorRef.current = detector;
@@ -127,6 +145,11 @@ export default function Home() {
       .then(() => {
         if (!active) return;
         detectorReadyRef.current = true;
+        setModelVariant(
+          detector.modelName === "YOLOv8s"
+            ? "YOLOv8s accuracy model"
+            : detector.modelName,
+        );
         setModelState("ready");
       })
       .catch(() => {
@@ -156,18 +179,40 @@ export default function Home() {
     [],
   );
 
-  const runDetection = useCallback(async (source: CanvasImageSource) => {
+  const runDetection = useCallback(async (
+    source: CanvasImageSource,
+    options: { detailed?: boolean; track?: boolean } = {},
+  ) => {
     const detector = detectorRef.current;
     if (!detector || inferenceBusyRef.current) return;
     inferenceBusyRef.current = true;
     setProcessing(true);
     const started = performance.now();
     try {
-      const found = await detector.detect(source, 0.2);
-      setRawDetections(found);
+      const found = await detector.detect(source, 0.14, {
+        detailed: options.detailed,
+      });
+      const presented = options.track
+        ? trackerRef.current.update(found)
+        : found;
+      if (!options.track) trackerRef.current.reset();
+      setRawDetections(presented);
       setProcessingTime(Math.round(performance.now() - started));
       detectorReadyRef.current = true;
+      setModelVariant(
+        detector.modelName === "YOLOv8s"
+          ? "YOLOv8s accuracy model"
+          : detector.modelName,
+      );
       setModelState("ready");
+      if (options.detailed) {
+        const visible = filterByConfidence(
+          presented,
+          minimumConfidenceRef.current,
+        );
+        setResultLabel("DETAILED SCENE DESCRIPTION");
+        setResult(describeScene(visible));
+      }
     } catch (error) {
       setModelState("error");
       setResultLabel("DETECTION ERROR");
@@ -196,7 +241,7 @@ export default function Home() {
         !inferenceBusyRef.current
       ) {
         lastInferenceRef.current = timestamp;
-        void runDetection(video);
+        void runDetection(video, { track: true });
       }
       animationFrame = requestAnimationFrame(detectFrame);
     };
@@ -238,6 +283,7 @@ export default function Home() {
     const started = await camera.start();
     if (started) {
       setSourceKind("camera");
+      trackerRef.current.reset();
       setRawDetections([]);
       setImageUrl(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
@@ -248,6 +294,7 @@ export default function Home() {
 
   const handleStop = useCallback(() => {
     camera.stop();
+    trackerRef.current.reset();
     setSourceKind("idle");
     setRawDetections([]);
     setProcessingTime(null);
@@ -270,6 +317,7 @@ export default function Home() {
         return;
       }
       camera.stop();
+      trackerRef.current.reset();
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const nextUrl = URL.createObjectURL(file);
       objectUrlRef.current = nextUrl;
@@ -289,19 +337,18 @@ export default function Home() {
       setRawDetections(demoDetections);
       setModelState("fallback");
       setProcessingTime(18);
-      setResultLabel("SIMULATED DETECTIONS");
-      setResult(
-        "Demo mode shows a simulated workspace with one person, a cup, a laptop, and a table. Use it to explore the interface without a camera.",
-      );
+      setResultLabel("SIMULATED SCENE DESCRIPTION");
+      setResult(describeScene(demoDetections));
       return;
     }
     if (sourceKind === "upload" && imageRef.current) {
-      void runDetection(imageRef.current);
+      void runDetection(imageRef.current, { detailed: true });
     }
   }, [runDetection, sourceKind]);
 
   const handleDemo = useCallback(() => {
     camera.stop();
+    trackerRef.current.reset();
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -309,6 +356,8 @@ export default function Home() {
     setImageUrl(createDemoScene());
     setSourceKind("demo");
     setRawDetections([]);
+    setResultLabel("SCENE DESCRIPTION");
+    setResult(describeScene(demoDetections));
   }, [camera]);
 
   const publishResult = useCallback(
@@ -433,7 +482,7 @@ export default function Home() {
           <span className={modelState === "ready" ? "is-online" : ""} />
           <div>
             <strong>{modelState === "ready" ? "ON-DEVICE MODEL READY" : "INITIALIZING VISION CORE"}</strong>
-            <small>YOLOv8n · COCO 80 classes</small>
+            <small>{modelVariant} · COCO 80 classes</small>
           </div>
         </div>
       </header>
@@ -476,6 +525,7 @@ export default function Home() {
         <AnalysisPanel
           result={result}
           resultLabel={resultLabel}
+          sceneDescription={sceneDescription}
           analyzing={remoteAnalyzing}
           detections={detections}
           question={question}
