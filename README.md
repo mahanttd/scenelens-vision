@@ -72,7 +72,7 @@ All three variables must be present for remote verification. They are never expo
 
 ## How the AI components work
 
-The browser loads `public/models/yolov8n.onnx` once and uses ONNX Runtime Web’s WebAssembly execution provider. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, filters detections, maps coordinates back to the displayed source, and applies class-aware non-maximum suppression. Live inference is throttled to roughly one pass every 700 ms and never sends continuous frames to a server.
+The browser loads the versioned YOLOv8n model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, filters detections, maps coordinates back to the displayed source, and applies class-aware non-maximum suppression. Live inference is throttled to roughly one pass every 700 ms and never sends continuous frames to a server.
 
 YOLOv8n recognizes common COCO objects. It does not understand every item, activity, relationship, or subtle visual detail. Rule-based descriptions report only supported detections and explicitly state uncertainty.
 
@@ -124,7 +124,7 @@ npm run start
 
 The project uses the Sites-compatible Vinext/Vite worker structure and produces Cloudflare Worker-compatible ESM output. For Sites hosting, configure optional environment values as hosted secrets, save a version from the pushed source commit, and deploy that saved version. Leave the environment unset for an on-device-only deployment.
 
-Camera access requires HTTPS on a deployed domain. Keep the 12.8 MB ONNX model cacheable for faster repeat visits. The first on-device analysis also needs network access to fetch the version-pinned WebAssembly runtime; subsequent behavior depends on the browser cache.
+Camera access requires HTTPS on a deployed domain. The first on-device analysis needs network access to fetch the 12.8 MB model and version-pinned WebAssembly runtime; subsequent behavior depends on the browser cache.
 
 ## Future improvements
 

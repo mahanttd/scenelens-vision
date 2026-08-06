@@ -1,7 +1,8 @@
 import type { Detection } from "./types";
 
 const MODEL_SIZE = 640;
-const MODEL_PATH = "/models/yolov8n.onnx";
+const MODEL_PATH =
+  "https://huggingface.co/cabelo/yolov8/resolve/main/yolov8n.onnx";
 
 const COCO_LABELS = [
   "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
