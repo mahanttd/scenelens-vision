@@ -79,7 +79,7 @@ export async function POST(request: Request) {
           {
             role: "system",
             content:
-              "You are a cautious security-review assistant. Report visible people and possible hazards only from visible evidence. Express uncertainty, never identify people, never infer intent, and never present a detection as proof of danger. State that the result requires human review.",
+              "You are a cautious general-purpose visual assistant. Answer only from visible evidence, express uncertainty, never identify people, and never present uncertain observations as facts.",
           },
           {
             role: "user",

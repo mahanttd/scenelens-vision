@@ -8,21 +8,19 @@ import {
   RefreshCcw,
   ScanSearch,
   Search,
-  ShieldAlert,
   Sparkles,
   Users,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { friendlyLabel, isPotentiallyHarmfulObject } from "../lib/reasoning";
-import type { ActivityAlert, Detection } from "../lib/types";
+import { friendlyLabel } from "../lib/reasoning";
+import type { Detection } from "../lib/types";
 
 type Props = {
   result: string;
   resultLabel: string;
   sceneDescription: string;
-  activityAlerts: ActivityAlert[];
   analyzing: boolean;
   detections: Detection[];
   question: string;
@@ -42,10 +40,10 @@ type Props = {
 };
 
 const quickQuestions = [
-  { label: "Security summary", prompt: "Give me a security summary", icon: Sparkles },
-  { label: "Possible firearm?", prompt: "Is a possible firearm visible?", icon: ShieldAlert },
-  { label: "Potential hazards?", prompt: "Are any potential hazards visible?", icon: Search },
-  { label: "Is anyone holding one?", prompt: "Is a person holding a potential hazard?", icon: ListTree },
+  { label: "Describe scene", prompt: "Describe the visible scene", icon: Sparkles },
+  { label: "Is that a bottle?", prompt: "Is a water bottle visible?", icon: Search },
+  { label: "What am I holding?", prompt: "What is the person holding?", icon: ListTree },
+  { label: "What's on the table?", prompt: "What is on the table?", icon: ScanSearch },
   { label: "Count visible people", prompt: "Count the visible people", icon: Users },
 ];
 
@@ -53,7 +51,6 @@ export function AnalysisPanel({
   result,
   resultLabel,
   sceneDescription,
-  activityAlerts,
   analyzing,
   detections,
   question,
@@ -71,9 +68,6 @@ export function AnalysisPanel({
   onReplay,
   onStopSpeech,
 }: Props) {
-  const hazardCount = detections.filter((detection) =>
-    isPotentiallyHarmfulObject(detection.label),
-  ).length;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (question.trim()) onAsk(question.trim());
@@ -83,10 +77,13 @@ export function AnalysisPanel({
     <aside className="analysis-shell" aria-labelledby="analysis-heading">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">SECURITY INTELLIGENCE</p>
-          <h2 id="analysis-heading">People and potential hazards</h2>
+          <p className="eyebrow">SCENE INTELLIGENCE</p>
+          <h2 id="analysis-heading">Ask about what&apos;s visible</h2>
         </div>
-        <span className={`analysis-orb ${analyzing ? "is-active" : ""}`} aria-hidden="true" />
+        <span
+          className={`analysis-orb ${analyzing ? "is-active" : ""}`}
+          aria-hidden="true"
+        />
       </div>
 
       <div className="privacy-strip">
@@ -94,38 +91,17 @@ export function AnalysisPanel({
       </div>
 
       <section
-        className={`scene-summary-card ${hazardCount ? "is-alert" : ""}`}
+        className="scene-summary-card"
         aria-labelledby="scene-summary-heading"
         data-testid="scene-description"
       >
         <div className="scene-summary-card__header">
-          <span id="scene-summary-heading"><ScanSearch size={15} /> LIVE SECURITY SUMMARY</span>
-          <span>{hazardCount ? `${hazardCount} REVIEW` : "MONITORING"}</span>
+          <span id="scene-summary-heading">
+            <ScanSearch size={15} /> LIVE SCENE DESCRIPTION
+          </span>
+          <span>{detections.length ? `${detections.length} OBJECTS` : "SCANNING"}</span>
         </div>
         <p>{sceneDescription}</p>
-      </section>
-
-      <section className="activity-card" aria-labelledby="activity-heading" data-testid="activity-alerts">
-        <div className="activity-card__header">
-          <span id="activity-heading"><ShieldAlert size={15} /> OBJECTIVE ACTIVITY</span>
-          <span>NO SUSPICION SCORE</span>
-        </div>
-        {activityAlerts.length === 0 ? (
-          <p className="activity-card__empty">
-            No activity events yet. SceneLens can report entry, time in view,
-            and proximity to a detected hazard.
-          </p>
-        ) : (
-          <div className="activity-list">
-            {activityAlerts.slice(0, 4).map((alert) => (
-              <div className={`activity-item activity-item--${alert.severity}`} key={alert.id}>
-                <span>{alert.type.replaceAll("-", " ")}</span>
-                <p>{alert.message}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        <small>Based only on visible timing and geometry—not appearance, identity, intent, or emotion.</small>
       </section>
 
       <div className="result-card" aria-live="polite" data-testid="analysis-result">
@@ -154,7 +130,7 @@ export function AnalysisPanel({
         </div>
       </div>
 
-      <div className="quick-grid" aria-label="Quick security questions">
+      <div className="quick-grid" aria-label="Quick scene questions">
         {quickQuestions.map(({ label, prompt, icon: Icon }) => (
           <button type="button" key={prompt} onClick={() => onAsk(prompt)} disabled={analyzing}>
             <Icon size={16} />
@@ -164,14 +140,14 @@ export function AnalysisPanel({
       </div>
 
       <form className="question-form" onSubmit={submit}>
-        <label htmlFor="scene-question">Ask about this security frame</label>
+        <label htmlFor="scene-question">Ask about this frame</label>
         <div>
           <input
             id="scene-question"
             value={question}
             onChange={(event) => onQuestionChange(event.target.value)}
             maxLength={500}
-            placeholder="Is anyone near a potential hazard?"
+            placeholder="Is that a water bottle?"
           />
           <button type="submit" aria-label="Ask SceneLens" disabled={analyzing || !question.trim()}>
             <Mic2 size={17} />
@@ -182,14 +158,14 @@ export function AnalysisPanel({
       <div className="settings-stack">
         <div className="toggle-row">
           <span>
-            <strong>Remote security review</strong>
+            <strong>Remote visual analysis</strong>
             <small>Only after you ask or capture · optional provider</small>
           </span>
           <button
             className="switch-button"
             type="button"
             role="switch"
-            aria-label="Remote security review"
+            aria-label="Remote visual analysis"
             aria-checked={remoteEnabled}
             onClick={() => onRemoteEnabledChange(!remoteEnabled)}
           >
@@ -198,7 +174,9 @@ export function AnalysisPanel({
         </div>
         <div className="toggle-row">
           <span>
-            <strong><AudioLines size={14} /> Automatic narration</strong>
+            <strong>
+              <AudioLines size={14} /> Automatic narration
+            </strong>
             <small>Reads a summary at most once every 12 seconds</small>
           </span>
           <button
@@ -217,13 +195,13 @@ export function AnalysisPanel({
 
       <div className="object-readout">
         <div className="section-label">
-          <span>SECURITY READOUT</span>
-          <span>{detections.length} RELEVANT · {hazardCount} REVIEW</span>
+          <span>OBJECT READOUT</span>
+          <span>{detections.length} DETECTED</span>
         </div>
         {detections.length === 0 ? (
-          <p className="empty-copy">No people or supported potential hazards are above the confidence threshold.</p>
+          <p className="empty-copy">No objects are above the confidence threshold yet.</p>
         ) : (
-          detections.slice(0, 8).map((detection) => (
+          detections.slice(0, 10).map((detection) => (
             <div className="object-row" key={detection.id}>
               <span>{friendlyLabel(detection.label)}</span>
               <div className="confidence-meter" aria-hidden="true">
@@ -233,8 +211,9 @@ export function AnalysisPanel({
             </div>
           ))
         )}
-        <p className="security-limit">
-          Scope: people, possible firearms, knives, scissors, and baseball bats. AI can miss objects or confuse toys and tools; verify every alert and never use it as proof of intent.
+        <p className="model-note">
+          Recognizes hundreds of common object categories. Bottles receive a lower detection
+          threshold, while person labels require stronger evidence.
         </p>
       </div>
     </aside>

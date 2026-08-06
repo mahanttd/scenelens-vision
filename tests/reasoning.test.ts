@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  answerLocalQuestion,
   describeScene,
   estimateHolding,
   filterByConfidence,
@@ -16,16 +17,16 @@ const person: Detection = {
   box: { x: 0.2, y: 0.1, width: 0.35, height: 0.8 },
 };
 
-test("estimates a potential hazard near a hand region as possibly held", () => {
-  const knife: Detection = {
-    id: "knife-1",
-    label: "knife",
+test("estimates an everyday object near a hand region as possibly held", () => {
+  const cup: Detection = {
+    id: "cup-1",
+    label: "cup",
     confidence: 0.88,
     box: { x: 0.48, y: 0.5, width: 0.08, height: 0.13 },
   };
-  const estimate = estimateHolding([person, knife]);
+  const estimate = estimateHolding([person, cup]);
   assert.ok(estimate);
-  assert.equal(estimate.object.label, "knife");
+  assert.equal(estimate.object.label, "cup");
   assert.ok(estimate.confidence >= 0.38 && estimate.confidence < 1);
 });
 
@@ -59,56 +60,60 @@ test("filters detections at the configured confidence boundary", () => {
   );
 });
 
-test("describes people and potential hazards without inferring intent", () => {
-  const knife: Detection = {
-    id: "knife-1",
-    label: "knife",
+test("describes a mixed everyday scene", () => {
+  const laptop: Detection = {
+    id: "laptop-1",
+    label: "laptop",
     confidence: 0.91,
-    box: { x: 0.76, y: 0.66, width: 0.08, height: 0.2 },
+    box: { x: 0.66, y: 0.56, width: 0.22, height: 0.18 },
   };
-  const description = describeScene([person, knife]);
-  assert.match(description, /one person/i);
-  assert.match(description, /possible knife/i);
-  assert.match(description, /lower right/i);
-  assert.match(description, /does not establish intent/i);
+  const bottle: Detection = {
+    id: "bottle-1",
+    label: "bottle",
+    confidence: 0.84,
+    box: { x: 0.08, y: 0.46, width: 0.07, height: 0.24 },
+  };
+  const description = describeScene([person, laptop, bottle]);
+  assert.match(description, /workspace/i);
+  assert.match(description, /person/i);
+  assert.match(description, /water bottle/i);
+  assert.match(description, /laptop/i);
 });
 
-test("suppresses ordinary objects while keeping hazards and strong person detections", () => {
+test("boosts small objects while requiring stronger evidence for a person", () => {
   const bottle: Detection = {
     id: "bottle-low",
     label: "bottle",
     confidence: 0.18,
     box: { x: 0.4, y: 0.2, width: 0.16, height: 0.55 },
   };
-  const knife: Detection = {
-    id: "knife-low",
-    label: "knife",
+  const laptop: Detection = {
+    id: "laptop-low",
+    label: "laptop",
     confidence: 0.18,
-    box: { x: 0.44, y: 0.3, width: 0.07, height: 0.2 },
+    box: { x: 0.44, y: 0.55, width: 0.2, height: 0.14 },
   };
-  const weakPerson = { ...person, id: "person-weak", confidence: 0.36 };
+  const weakPerson = { ...person, id: "person-weak", confidence: 0.44 };
   const visible = filterSceneDetections(
-    [bottle, knife, weakPerson, person],
+    [bottle, laptop, weakPerson, person],
     0.25,
   );
   assert.deepEqual(
     visible.map((item) => item.id),
-    ["knife-low", "person-1"],
+    ["bottle-low", "laptop-low", "person-1"],
   );
-  assert.equal(friendlyLabel("knife"), "possible knife");
+  assert.equal(friendlyLabel("bottle"), "water bottle");
 });
 
-test("keeps possible firearm detections at a cautious confidence threshold", () => {
-  const weakGun: Detection = {
-    id: "gun-weak",
-    label: "gun",
-    confidence: 0.29,
-    box: { x: 0.4, y: 0.4, width: 0.1, height: 0.12 },
+test("answers direct questions about a water bottle", () => {
+  const bottle: Detection = {
+    id: "bottle-1",
+    label: "bottle",
+    confidence: 0.82,
+    box: { x: 0.4, y: 0.25, width: 0.12, height: 0.5 },
   };
-  const reviewedGun = { ...weakGun, id: "gun-reviewed", confidence: 0.31 };
-  assert.deepEqual(
-    filterSceneDetections([weakGun, reviewedGun], 0.25).map((item) => item.id),
-    ["gun-reviewed"],
+  assert.match(
+    answerLocalQuestion("Is a water bottle visible?", [bottle]),
+    /water bottle.*82%/i,
   );
-  assert.equal(friendlyLabel("gun"), "possible firearm");
 });

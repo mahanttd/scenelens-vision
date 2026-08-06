@@ -13,21 +13,22 @@ async function render() {
   );
 }
 
-test("server-renders the SceneLens application shell", async () => {
+test("server-renders the general-purpose SceneLens application shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>SceneLens/);
-  assert.match(html, /REAL-TIME SECURITY AWARENESS/);
-  assert.match(html, /SECURITY INTELLIGENCE/);
-  assert.match(html, /possible firearms, knives, scissors, and baseball bats/i);
-  assert.match(html, /NO SUSPICION SCORE/);
-  assert.match(html, /Possible-firearm alerts require human verification/i);
+  assert.match(html, /REAL-TIME VISUAL ASSISTANCE/);
+  assert.match(html, /GENERAL OBJECT DETECTION/);
+  assert.match(html, /SCENE INTELLIGENCE/);
+  assert.match(html, /Ask about this frame/);
+  assert.match(html, /Is that a water bottle/);
+  assert.match(html, /Bottles receive a lower detection threshold/i);
   assert.match(html, /NO FACIAL RECOGNITION/);
-  assert.match(html, /Ask about this security frame/);
   assert.match(html, /CAMERA SOURCE/);
   assert.doesNotMatch(html, /aerospace|aircraft|airworthiness/i);
+  assert.doesNotMatch(html, /SECURITY INTELLIGENCE|NO SUSPICION SCORE/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 

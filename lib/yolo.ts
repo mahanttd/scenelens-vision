@@ -283,9 +283,9 @@ export const demoDetections: Detection[] = [
     box: { x: 0.18, y: 0.08, width: 0.35, height: 0.82 },
   },
   {
-    id: "demo-knife",
-    label: "knife",
-    confidence: 0.84,
-    box: { x: 0.42, y: 0.47, width: 0.08, height: 0.22 },
+    id: "demo-cup",
+    label: "cup",
+    confidence: 0.89,
+    box: { x: 0.41, y: 0.52, width: 0.1, height: 0.19 },
   },
 ];

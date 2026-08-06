@@ -14,7 +14,6 @@ import { CameraStage } from "../components/camera-stage";
 import { HistoryPanel } from "../components/history-panel";
 import { useCamera } from "../hooks/use-camera";
 import { useSpeech } from "../hooks/use-speech";
-import { ActivityMonitor } from "../lib/activity-monitor";
 import { DetectionTracker } from "../lib/detection-tracker";
 import { getHistoryStore } from "../lib/history-store";
 import {
@@ -24,9 +23,8 @@ import {
   filterSceneDetections,
 } from "../lib/reasoning";
 import { requestRemoteAnalysis } from "../lib/remote-analysis";
-import { SecurityDetector } from "../lib/security-detector";
+import { SceneDetector } from "../lib/scene-detector";
 import type {
-  ActivityAlert,
   Detection,
   HistoryRecord,
   ModelState,
@@ -35,7 +33,7 @@ import type {
 import { demoDetections } from "../lib/yolo";
 
 const DEFAULT_RESULT =
-  "Choose a camera or image to monitor for people, possible firearms, and supported potential hazards. SceneLens reports uncertainty and never infers identity, suspicion, or intent.";
+  "Choose a camera or image, then ask a question. SceneLens identifies common objects, describes the whole scene, and says when it is uncertain.";
 
 function uniqueId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -72,24 +70,12 @@ function createDemoScene() {
   context.fillRect(235, 250, 55, 250);
   context.fillRect(455, 250, 55, 250);
 
-  context.save();
-  context.translate(535, 365);
-  context.rotate(0.18);
   context.fillStyle = "#d9a441";
-  context.fillRect(0, 86, 24, 58);
-  context.fillStyle = "#d8e2e3";
-  context.fillRect(3, 0, 18, 92);
+  context.fillRect(535, 382, 80, 118);
+  context.strokeStyle = "#d9a441";
+  context.lineWidth = 18;
   context.beginPath();
-  context.moveTo(3, 0);
-  context.lineTo(21, 0);
-  context.lineTo(12, -22);
-  context.closePath();
-  context.fill();
-  context.restore();
-  context.strokeStyle = "rgba(255, 160, 96, .75)";
-  context.lineWidth = 3;
-  context.beginPath();
-  context.arc(548, 423, 80, 0, Math.PI * 2);
+  context.arc(615, 425, 36, -Math.PI / 2, Math.PI / 2);
   context.stroke();
 
   context.fillStyle = "#566b73";
@@ -110,10 +96,9 @@ function createDemoScene() {
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const detectorRef = useRef<SecurityDetector | null>(null);
+  const detectorRef = useRef<SceneDetector | null>(null);
   const detectorReadyRef = useRef(false);
   const trackerRef = useRef(new DetectionTracker());
-  const activityMonitorRef = useRef(new ActivityMonitor());
   const inferenceBusyRef = useRef(false);
   const lastInferenceRef = useRef(0);
   const lastDetailInferenceRef = useRef(0);
@@ -129,16 +114,15 @@ export default function Home() {
   const [rawDetections, setRawDetections] = useState<Detection[]>([]);
   const [minimumConfidence, setMinimumConfidence] = useState(0.25);
   const [modelState, setModelState] = useState<ModelState>("loading");
-  const [modelVariant, setModelVariant] = useState("D-FINE-S security model");
+  const [modelVariant, setModelVariant] = useState("D-FINE-S object model");
   const [processing, setProcessing] = useState(false);
   const [processingTime, setProcessingTime] = useState<number | null>(null);
   const [result, setResult] = useState(DEFAULT_RESULT);
-  const [resultLabel, setResultLabel] = useState("SECURITY MONITOR READY");
+  const [resultLabel, setResultLabel] = useState("READY FOR ANALYSIS");
   const [question, setQuestion] = useState("");
   const [remoteEnabled, setRemoteEnabled] = useState(false);
   const [remoteAnalyzing, setRemoteAnalyzing] = useState(false);
   const [history, setHistory] = useState<HistoryRecord[]>([]);
-  const [activityAlerts, setActivityAlerts] = useState<ActivityAlert[]>([]);
 
   const detections = useMemo(
     () => filterSceneDetections(rawDetections, minimumConfidence),
@@ -147,10 +131,10 @@ export default function Home() {
 
   const sceneDescription = useMemo(() => {
     if (sourceKind === "idle") {
-      return "Start a camera or upload an image to monitor for people and supported potential hazards.";
+      return "Start a camera or upload an image to identify objects and understand the scene.";
     }
     if (processing && detections.length === 0) {
-      return "Scanning for people and supported potential hazards…";
+      return "Scanning the scene for people and everyday objects…";
     }
     return describeScene(detections);
   }, [detections, processing, sourceKind]);
@@ -160,7 +144,7 @@ export default function Home() {
   }, [minimumConfidence]);
 
   useEffect(() => {
-    const detector = new SecurityDetector();
+    const detector = new SceneDetector();
     detectorRef.current = detector;
     let active = true;
     detector
@@ -170,19 +154,13 @@ export default function Home() {
         detectorReadyRef.current = true;
         setModelVariant(detector.modelName);
         setModelState("ready");
-        if (!detector.supportsFirearms) {
-          setResultLabel("MODEL NOTICE");
-          setResult(
-            "The general security model loaded, but its firearm class is unavailable. Check the connection and reload to restore firearm review alerts.",
-          );
-        }
       })
       .catch(() => {
         if (!active) return;
         setModelState("error");
         setResultLabel("MODEL NOTICE");
         setResult(
-          "The on-device YOLO model could not initialize. Camera and upload controls still work; try the simulated scene or reload.",
+          "The on-device object model could not initialize. Camera and upload controls still work; try the demo scene or reload.",
         );
       });
     return () => {
@@ -204,67 +182,52 @@ export default function Home() {
     [],
   );
 
-  const runDetection = useCallback(async (
-    source: CanvasImageSource,
-    options: { detailed?: boolean; track?: boolean } = {},
-  ) => {
-    const detector = detectorRef.current;
-    if (!detector || inferenceBusyRef.current) return;
-    inferenceBusyRef.current = true;
-    setProcessing(true);
-    const started = performance.now();
-    try {
-      const found = await detector.detect(source, 0.08, {
-        detailed: options.detailed,
-      });
-      const presented = options.track
-        ? trackerRef.current.update(found)
-        : found;
-      if (!options.track) trackerRef.current.reset();
-      const visible = filterSceneDetections(
-        presented,
-        minimumConfidenceRef.current,
-      );
-      if (options.track) {
-        const freshAlerts = activityMonitorRef.current.update(visible);
-        if (freshAlerts.length > 0) {
-          setActivityAlerts((current) => [
-            ...freshAlerts.toReversed(),
-            ...current,
-          ].slice(0, 6));
-          const reviewAlert = freshAlerts.find(
-            (alert) => alert.severity === "review",
-          );
-          if (reviewAlert) {
-            setResultLabel("OBJECTIVE ACTIVITY ALERT");
-            setResult(
-              `${reviewAlert.message} This is an observable-event alert, not a suspicion or intent judgment.`,
-            );
-          }
+  const runDetection = useCallback(
+    async (
+      source: CanvasImageSource,
+      options: { detailed?: boolean; track?: boolean } = {},
+    ) => {
+      const detector = detectorRef.current;
+      if (!detector || inferenceBusyRef.current) return;
+      inferenceBusyRef.current = true;
+      setProcessing(true);
+      const started = performance.now();
+      try {
+        const found = await detector.detect(source, 0.08, {
+          detailed: options.detailed,
+        });
+        const presented = options.track
+          ? trackerRef.current.update(found)
+          : found;
+        if (!options.track) trackerRef.current.reset();
+        const visible = filterSceneDetections(
+          presented,
+          minimumConfidenceRef.current,
+        );
+        setRawDetections(presented);
+        setProcessingTime(Math.round(performance.now() - started));
+        detectorReadyRef.current = true;
+        setModelVariant(detector.modelName);
+        setModelState("ready");
+        if (options.detailed && !options.track) {
+          setResultLabel("DETAILED SCENE SUMMARY");
+          setResult(describeScene(visible));
         }
+      } catch (error) {
+        setModelState("error");
+        setResultLabel("DETECTION ERROR");
+        setResult(
+          error instanceof Error
+            ? `${error.message}. Try the demo scene while the model is unavailable.`
+            : "The current frame could not be analyzed.",
+        );
+      } finally {
+        inferenceBusyRef.current = false;
+        setProcessing(false);
       }
-      setRawDetections(presented);
-      setProcessingTime(Math.round(performance.now() - started));
-      detectorReadyRef.current = true;
-      setModelVariant(detector.modelName);
-      setModelState("ready");
-      if (options.detailed && !options.track) {
-        setResultLabel("DETAILED SECURITY SUMMARY");
-        setResult(describeScene(visible));
-      }
-    } catch (error) {
-      setModelState("error");
-      setResultLabel("DETECTION ERROR");
-      setResult(
-        error instanceof Error
-          ? `${error.message}. Try the simulated scene while the model is unavailable.`
-          : "The current frame could not be analyzed.",
-      );
-    } finally {
-      inferenceBusyRef.current = false;
-      setProcessing(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (sourceKind !== "camera" || camera.state !== "live") return;
@@ -306,13 +269,16 @@ export default function Home() {
   }, [detections, sourceKind, speech]);
 
   const captureFrameDataUrl = useCallback(() => {
-    const source =
-      sourceKind === "camera" ? videoRef.current : imageRef.current;
+    const source = sourceKind === "camera" ? videoRef.current : imageRef.current;
     if (!source) return null;
     const width =
-      source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth;
+      source instanceof HTMLVideoElement
+        ? source.videoWidth
+        : source.naturalWidth;
     const height =
-      source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight;
+      source instanceof HTMLVideoElement
+        ? source.videoHeight
+        : source.naturalHeight;
     if (!width || !height) return null;
     const scale = Math.min(1, 960 / width);
     const canvas = document.createElement("canvas");
@@ -329,22 +295,20 @@ export default function Home() {
     if (started) {
       setSourceKind("camera");
       trackerRef.current.reset();
-      activityMonitorRef.current.reset();
-      setActivityAlerts([]);
       lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
       setImageUrl(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
-      setResultLabel("LIVE SECURITY MONITORING");
-      setResult("Security monitoring is active. People and supported potential hazards will be highlighted on-device.");
+      setResultLabel("LIVE OBJECT DETECTION");
+      setResult(
+        "Real-time AI object detection is active. Point the camera at an object and SceneLens will keep analyzing it.",
+      );
     }
   }, [camera]);
 
   const handleStop = useCallback(() => {
     camera.stop();
     trackerRef.current.reset();
-    activityMonitorRef.current.reset();
-    setActivityAlerts([]);
     setSourceKind("idle");
     setRawDetections([]);
     setProcessingTime(null);
@@ -359,8 +323,6 @@ export default function Home() {
       if (!started) return;
       setSourceKind("camera");
       trackerRef.current.reset();
-      activityMonitorRef.current.reset();
-      setActivityAlerts([]);
       lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
       setImageUrl(null);
@@ -389,8 +351,6 @@ export default function Home() {
       }
       camera.stop();
       trackerRef.current.reset();
-      activityMonitorRef.current.reset();
-      setActivityAlerts([]);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const nextUrl = URL.createObjectURL(file);
       objectUrlRef.current = nextUrl;
@@ -399,7 +359,7 @@ export default function Home() {
       setRawDetections([]);
       setProcessingTime(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
-      setResultLabel("SECURITY IMAGE LOADED");
+      setResultLabel("IMAGE LOADED");
       setResult("Analyzing the uploaded image locally. The file has not left this device.");
     },
     [camera],
@@ -410,7 +370,7 @@ export default function Home() {
       setRawDetections(demoDetections);
       setModelState("fallback");
       setProcessingTime(18);
-      setResultLabel("SIMULATED SECURITY ALERT");
+      setResultLabel("SIMULATED RESULT");
       setResult(describeScene(demoDetections));
       return;
     }
@@ -422,8 +382,6 @@ export default function Home() {
   const handleDemo = useCallback(() => {
     camera.stop();
     trackerRef.current.reset();
-    activityMonitorRef.current.reset();
-    setActivityAlerts([]);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -431,7 +389,7 @@ export default function Home() {
     setImageUrl(createDemoScene());
     setSourceKind("demo");
     setRawDetections([]);
-    setResultLabel("SECURITY DEMO ALERT");
+    setResultLabel("DEMO SCENE");
     setResult(describeScene(demoDetections));
   }, [camera]);
 
@@ -449,7 +407,7 @@ export default function Home() {
       if (sourceKind === "idle") {
         publishResult(
           "NO VISUAL SOURCE",
-          "Start a camera, upload an image, or load the security demo before asking about it.",
+          "Start a camera, upload an image, or load the demo scene before asking about it.",
         );
         return;
       }
@@ -459,17 +417,24 @@ export default function Home() {
 
       const imageDataUrl = captureFrameDataUrl();
       if (!imageDataUrl) {
-        setResult(`${localAnswer} Remote verification was skipped because the frame was not ready.`);
+        setResult(
+          `${localAnswer} Remote verification was skipped because the frame was not ready.`,
+        );
         return;
       }
       setRemoteAnalyzing(true);
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 17_000);
       try {
-        const remote = await requestRemoteAnalysis(imageDataUrl, prompt, controller.signal);
+        const remote = await requestRemoteAnalysis(
+          imageDataUrl,
+          prompt,
+          controller.signal,
+        );
         publishResult(`VERIFIED · ${remote.provider}`, remote.answer);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Remote verification failed";
+        const message =
+          error instanceof Error ? error.message : "Remote verification failed";
         setResultLabel("ON-DEVICE ANALYSIS · REMOTE UNAVAILABLE");
         setResult(`${localAnswer} ${message}`);
       } finally {
@@ -509,14 +474,15 @@ export default function Home() {
       try {
         const remote = await requestRemoteAnalysis(
           imageDataUrl,
-          "Provide a cautious security summary. Report visible people and potential hazards without identifying anyone or inferring intent.",
+          "Describe the visible scene and identify the most important objects. Express uncertainty and do not identify people.",
         );
         const updated = { ...record, description: remote.answer };
         await historyStore.add(updated);
         setHistory(await historyStore.list());
         publishResult(`CAPTURE VERIFIED · ${remote.provider}`, remote.answer);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Remote verification failed";
+        const message =
+          error instanceof Error ? error.message : "Remote verification failed";
         setResult(`${description} Saved locally. ${message}`);
       } finally {
         setRemoteAnalyzing(false);
@@ -541,10 +507,14 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="SceneLens home">
-          <span className="brand-mark" aria-hidden="true"><Eye size={22} /></span>
+          <span className="brand-mark" aria-hidden="true">
+            <Eye size={22} />
+          </span>
           <span>
-            <strong>SCENE<span>LENS</span></strong>
-            <small>REAL-TIME SECURITY AWARENESS</small>
+            <strong>
+              SCENE<span>LENS</span>
+            </strong>
+            <small>REAL-TIME VISUAL ASSISTANCE</small>
           </span>
         </a>
         <div className="topbar-center" aria-label="Privacy status">
@@ -556,20 +526,29 @@ export default function Home() {
         <div className="system-state">
           <span className={modelState === "ready" ? "is-online" : ""} />
           <div>
-            <strong>{modelState === "ready" ? "ON-DEVICE MODEL READY" : "INITIALIZING VISION CORE"}</strong>
-            <small>{modelVariant} · PEOPLE + SUPPORTED HAZARDS</small>
+            <strong>
+              {modelState === "ready"
+                ? "ON-DEVICE MODEL READY"
+                : "INITIALIZING VISION CORE"}
+            </strong>
+            <small>{modelVariant} · GENERAL OBJECT DETECTION</small>
           </div>
         </div>
       </header>
 
       <div className="app-intro" id="top">
         <div>
-          <p className="eyebrow"><Radio size={13} /> PRIVATE, ON-DEVICE SECURITY MONITORING</p>
-          <h2>Monitor people. <span>Surface possible firearms and hazards.</span></h2>
+          <p className="eyebrow">
+            <Radio size={13} /> PRIVATE, ON-DEVICE COMPUTER VISION
+          </p>
+          <h2>
+            See what&apos;s here. <span>Understand the whole scene.</span>
+          </h2>
         </div>
         <p>
-          SceneLens uses on-device AI to flag people, possible firearms, and a
-          narrow set of potential hazards without identifying anyone or judging suspicion.
+          SceneLens uses real-time AI to recognize people and everyday objects,
+          describe their context, and handle bottle-versus-person ambiguity more
+          carefully.
         </p>
       </div>
 
@@ -605,7 +584,6 @@ export default function Home() {
           result={result}
           resultLabel={resultLabel}
           sceneDescription={sceneDescription}
-          activityAlerts={activityAlerts}
           analyzing={remoteAnalyzing}
           detections={detections}
           question={question}
@@ -625,11 +603,20 @@ export default function Home() {
         />
       </div>
 
-      <HistoryPanel records={history} onDelete={(id) => void handleDeleteHistory(id)} onClear={() => void handleClearHistory()} />
+      <HistoryPanel
+        records={history}
+        onDelete={(id) => void handleDeleteHistory(id)}
+        onClear={() => void handleClearHistory()}
+      />
 
       <footer className="footer">
-        <span><ShieldCheck size={15} /> Privacy-first security awareness</span>
-        <p>Not an emergency system. No identity, suspicion, or intent recognition. Possible-firearm alerts require human verification.</p>
+        <span>
+          <ShieldCheck size={15} /> Privacy-first visual assistance
+        </span>
+        <p>
+          On-device object detection with optional remote verification. No facial
+          recognition.
+        </p>
       </footer>
     </main>
   );

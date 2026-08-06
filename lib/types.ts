@@ -12,14 +12,6 @@ export type Detection = {
   box: BoundingBox;
 };
 
-export type ActivityAlert = {
-  id: string;
-  type: "entry" | "prolonged-presence" | "hazard-proximity";
-  severity: "info" | "review";
-  message: string;
-  createdAt: number;
-};
-
 export type HoldingEstimate = {
   person: Detection;
   object: Detection;

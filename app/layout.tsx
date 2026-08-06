@@ -13,20 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 const description =
-  "Private, on-device AI monitoring for people, possible firearms, and supported potential hazards.";
+  "Private, on-device AI object detection and scene descriptions for everyday objects.";
 
 export const metadata: Metadata = {
-  title: "SceneLens — Real-time AI security monitoring",
+  title: "SceneLens — Real-time AI visual assistance",
   description,
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
   openGraph: {
-    title: "SceneLens Security",
+    title: "SceneLens AI Vision",
     description,
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "SceneLens Security",
+    title: "SceneLens AI Vision",
     description,
   },
 };
