@@ -2,6 +2,7 @@
 
 import {
   AudioLines,
+  BrainCircuit,
   CircleStop,
   ListTree,
   Mic2,
@@ -9,13 +10,14 @@ import {
   ScanSearch,
   Search,
   Sparkles,
+  Trash2,
   Users,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { friendlyLabel } from "../lib/reasoning";
-import type { Detection } from "../lib/types";
+import type { Detection, VocabularyModelState } from "../lib/types";
 
 type Props = {
   result: string;
@@ -23,6 +25,14 @@ type Props = {
   sceneDescription: string;
   analyzing: boolean;
   detections: Detection[];
+  vocabularyInput: string;
+  onVocabularyInputChange: (value: string) => void;
+  vocabularyModelState: VocabularyModelState;
+  learnedVocabulary: string[];
+  continuousVocabulary: boolean;
+  onContinuousVocabularyChange: (enabled: boolean) => void;
+  onFindAnything: () => void;
+  onClearLearnedVocabulary: () => void;
   question: string;
   onQuestionChange: (question: string) => void;
   onAsk: (question: string) => void;
@@ -47,12 +57,28 @@ const quickQuestions = [
   { label: "Count visible people", prompt: "Count the visible people", icon: Users },
 ];
 
+function vocabularyStatus(state: VocabularyModelState) {
+  if (state === "loading") return "LOADING MODEL";
+  if (state === "scanning") return "SCANNING";
+  if (state === "ready") return "READY";
+  if (state === "error") return "UNAVAILABLE";
+  return "ON DEMAND";
+}
+
 export function AnalysisPanel({
   result,
   resultLabel,
   sceneDescription,
   analyzing,
   detections,
+  vocabularyInput,
+  onVocabularyInputChange,
+  vocabularyModelState,
+  learnedVocabulary,
+  continuousVocabulary,
+  onContinuousVocabularyChange,
+  onFindAnything,
+  onClearLearnedVocabulary,
   question,
   onQuestionChange,
   onAsk,
@@ -68,6 +94,7 @@ export function AnalysisPanel({
   onReplay,
   onStopSpeech,
 }: Props) {
+  const vocabularyBusy = ["loading", "scanning"].includes(vocabularyModelState);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (question.trim()) onAsk(question.trim());
@@ -102,6 +129,79 @@ export function AnalysisPanel({
           <span>{detections.length ? `${detections.length} OBJECTS` : "SCANNING"}</span>
         </div>
         <p>{sceneDescription}</p>
+      </section>
+
+      <section className="vocabulary-card" aria-labelledby="vocabulary-heading">
+        <div className="vocabulary-card__header">
+          <span id="vocabulary-heading">
+            <BrainCircuit size={15} /> FIND ANYTHING
+          </span>
+          <span>{vocabularyStatus(vocabularyModelState)}</span>
+        </div>
+        <p>
+          Search for nearly any named object beyond the automatic 365 classes.
+          The first scan downloads a larger private AI model once.
+        </p>
+        <form
+          className="vocabulary-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onFindAnything();
+          }}
+        >
+          <label htmlFor="vocabulary-input">Object names, separated by commas</label>
+          <div>
+            <input
+              id="vocabulary-input"
+              value={vocabularyInput}
+              onChange={(event) => onVocabularyInputChange(event.target.value)}
+              maxLength={1_000}
+              placeholder="saxophone, cordless drill, Stanley tumbler"
+            />
+            <button type="submit" disabled={vocabularyBusy}>
+              <ScanSearch size={15} /> {vocabularyBusy ? "Working…" : "Scan"}
+            </button>
+          </div>
+        </form>
+        <div className="vocabulary-learning-row">
+          <span>
+            <strong>{learnedVocabulary.length} learned names</strong>
+            <small>Saved only in this browser</small>
+          </span>
+          <button
+            className="switch-button"
+            type="button"
+            role="switch"
+            aria-label="Keep checking learned object names"
+            aria-checked={continuousVocabulary}
+            disabled={learnedVocabulary.length === 0}
+            onClick={() => onContinuousVocabularyChange(!continuousVocabulary)}
+          >
+            <span className="toggle" aria-hidden="true" />
+          </button>
+        </div>
+        {learnedVocabulary.length > 0 ? (
+          <div className="vocabulary-saved">
+            <div>
+              {[...learnedVocabulary]
+                .slice(-6)
+                .reverse()
+                .map((label) => <span key={label}>{label}</span>)}
+            </div>
+            <button
+              type="button"
+              onClick={onClearLearnedVocabulary}
+              aria-label="Clear learned object names"
+            >
+              <Trash2 size={13} /> Clear
+            </button>
+          </div>
+        ) : null}
+        <small className="vocabulary-honesty">
+          Open vocabulary is broad, not magic: it searches up to 40 names per scan
+          and may still miss small, hidden, or unfamiliar objects. It learns your
+          search vocabulary locally; it does not scrape or upload your camera images.
+        </small>
       </section>
 
       <div className="result-card" aria-live="polite" data-testid="analysis-result">
@@ -212,8 +312,8 @@ export function AnalysisPanel({
           ))
         )}
         <p className="model-note">
-          Recognizes hundreds of common object categories. Bottles receive a lower detection
-          threshold, while person labels require stronger evidence.
+          Fast mode recognizes 365 common categories. Find Anything adds virtually
+          unlimited named-object searches over time; people still require stronger evidence.
         </p>
       </div>
     </aside>

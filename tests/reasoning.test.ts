@@ -117,3 +117,17 @@ test("answers direct questions about a water bottle", () => {
     /water bottle.*82%/i,
   );
 });
+
+test("keeps lower-confidence results from an explicit open-vocabulary search", () => {
+  const saxophone: Detection = {
+    id: "open-saxophone",
+    label: "saxophone",
+    confidence: 0.11,
+    source: "open-vocabulary",
+    box: { x: 0.3, y: 0.2, width: 0.24, height: 0.62 },
+  };
+  assert.deepEqual(
+    filterSceneDetections([saxophone], 0.25).map((item) => item.id),
+    ["open-saxophone"],
+  );
+});

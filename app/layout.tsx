@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 const description =
-  "Private, on-device AI object detection and scene descriptions for everyday objects.";
+  "Private AI vision with 365 automatic object classes, open-vocabulary search, and device-local learning.";
 
 export const metadata: Metadata = {
   title: "SceneLens — Real-time AI visual assistance",

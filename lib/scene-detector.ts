@@ -102,6 +102,10 @@ export function resolveObjectConflicts(detections: Detection[]) {
   });
 }
 
+export function mergeSceneDetections(detections: Detection[]) {
+  return resolveObjectConflicts(nonMaximumSuppression([...detections]));
+}
+
 export class SceneDetector {
   private detector: ObjectDetectionPipeline | null = null;
   private fallback: YoloDetector | null = null;
@@ -173,6 +177,6 @@ export class SceneDetector {
         box: { x, y, width: right - x, height: bottom - y },
       });
     }
-    return resolveObjectConflicts(nonMaximumSuppression(detections));
+    return mergeSceneDetections(detections);
   }
 }

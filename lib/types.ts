@@ -9,8 +9,16 @@ export type Detection = {
   id: string;
   label: string;
   confidence: number;
+  source?: "automatic" | "open-vocabulary";
   box: BoundingBox;
 };
+
+export type VocabularyModelState =
+  | "idle"
+  | "loading"
+  | "scanning"
+  | "ready"
+  | "error";
 
 export type HoldingEstimate = {
   person: Detection;

@@ -316,11 +316,15 @@ export function filterByConfidence(
 export function sceneConfidenceThreshold(
   label: string,
   baselineConfidence: number,
+  source?: Detection["source"],
 ) {
   // Person detections need stronger evidence; bottles and other small objects
   // are intentionally allowed through earlier so they can win conflicts.
   if (label === "person") {
     return Math.max(0.48, baselineConfidence * 1.4);
+  }
+  if (source === "open-vocabulary") {
+    return Math.max(0.08, baselineConfidence * 0.4);
   }
   if (SMALL_OBJECT_LABELS.has(label)) {
     return Math.max(0.12, baselineConfidence * 0.62);
@@ -335,6 +339,10 @@ export function filterSceneDetections(
   return detections.filter(
     (detection) =>
       detection.confidence >=
-      sceneConfidenceThreshold(detection.label, baselineConfidence),
+      sceneConfidenceThreshold(
+        detection.label,
+        baselineConfidence,
+        detection.source,
+      ),
   );
 }

@@ -21,19 +21,28 @@ import {
   describeHolding,
   describeScene,
   filterSceneDetections,
+  friendlyLabel,
 } from "../lib/reasoning";
 import { requestRemoteAnalysis } from "../lib/remote-analysis";
-import { SceneDetector } from "../lib/scene-detector";
+import { OpenVocabularyDetector } from "../lib/open-vocabulary-detector";
+import { mergeSceneDetections, SceneDetector } from "../lib/scene-detector";
 import type {
   Detection,
   HistoryRecord,
   ModelState,
   SourceKind,
+  VocabularyModelState,
 } from "../lib/types";
+import {
+  loadLearnedVocabulary,
+  mergeLearnedVocabulary,
+  parseVocabularyInput,
+  saveLearnedVocabulary,
+} from "../lib/vocabulary";
 import { demoDetections } from "../lib/yolo";
 
 const DEFAULT_RESULT =
-  "Choose a camera or image, then ask a question. SceneLens identifies common objects, describes the whole scene, and says when it is uncertain.";
+  "Choose a camera or image. SceneLens automatically detects 365 object categories, and Find Anything can search for almost any object name you provide.";
 
 function uniqueId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -97,9 +106,12 @@ export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const detectorRef = useRef<SceneDetector | null>(null);
+  const openVocabularyDetectorRef = useRef(new OpenVocabularyDetector());
   const detectorReadyRef = useRef(false);
   const trackerRef = useRef(new DetectionTracker());
   const inferenceBusyRef = useRef(false);
+  const openVocabularyBusyRef = useRef(false);
+  const learnedVocabularyRef = useRef<string[]>([]);
   const lastInferenceRef = useRef(0);
   const lastDetailInferenceRef = useRef(0);
   const lastNarrationRef = useRef(0);
@@ -112,6 +124,7 @@ export default function Home() {
   const [sourceKind, setSourceKind] = useState<SourceKind>("idle");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<Detection[]>([]);
+  const [openVocabularyDetections, setOpenVocabularyDetections] = useState<Detection[]>([]);
   const [minimumConfidence, setMinimumConfidence] = useState(0.25);
   const [modelState, setModelState] = useState<ModelState>("loading");
   const [modelVariant, setModelVariant] = useState("D-FINE-S object model");
@@ -123,10 +136,19 @@ export default function Home() {
   const [remoteEnabled, setRemoteEnabled] = useState(false);
   const [remoteAnalyzing, setRemoteAnalyzing] = useState(false);
   const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const [vocabularyInput, setVocabularyInput] = useState("");
+  const [learnedVocabulary, setLearnedVocabulary] = useState<string[]>([]);
+  const [vocabularyModelState, setVocabularyModelState] =
+    useState<VocabularyModelState>("idle");
+  const [continuousVocabulary, setContinuousVocabulary] = useState(true);
 
   const detections = useMemo(
-    () => filterSceneDetections(rawDetections, minimumConfidence),
-    [minimumConfidence, rawDetections],
+    () =>
+      filterSceneDetections(
+        mergeSceneDetections([...rawDetections, ...openVocabularyDetections]),
+        minimumConfidence,
+      ),
+    [minimumConfidence, openVocabularyDetections, rawDetections],
   );
 
   const sceneDescription = useMemo(() => {
@@ -142,6 +164,15 @@ export default function Home() {
   useEffect(() => {
     minimumConfidenceRef.current = minimumConfidence;
   }, [minimumConfidence]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const saved = loadLearnedVocabulary();
+      learnedVocabularyRef.current = saved;
+      setLearnedVocabulary(saved);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const detector = new SceneDetector();
@@ -290,6 +321,116 @@ export default function Home() {
     return canvas.toDataURL("image/jpeg", 0.82);
   }, [sourceKind]);
 
+  const rememberVocabulary = useCallback((labels: string[]) => {
+    const next = mergeLearnedVocabulary(learnedVocabularyRef.current, labels);
+    learnedVocabularyRef.current = next;
+    setLearnedVocabulary(next);
+    saveLearnedVocabulary(next);
+    return next;
+  }, []);
+
+  const runOpenVocabularyScan = useCallback(
+    async (labels: string[], options: { silent?: boolean } = {}) => {
+      if (openVocabularyBusyRef.current || labels.length === 0) return;
+      const source =
+        sourceKind === "camera" ? videoRef.current : imageRef.current;
+      if (!source || sourceKind === "idle") {
+        if (!options.silent) {
+          setResultLabel("NO VISUAL SOURCE");
+          setResult("Start a camera, upload an image, or load the demo before using Find Anything.");
+        }
+        return;
+      }
+
+      const detector = openVocabularyDetectorRef.current;
+      openVocabularyBusyRef.current = true;
+      setVocabularyModelState(detector.isReady ? "scanning" : "loading");
+      if (!options.silent) {
+        setResultLabel(detector.isReady ? "EXPANDED SCAN" : "LOADING EXPANDED AI");
+        setResult(
+          detector.isReady
+            ? `Searching this frame for ${labels.join(", ")}.`
+            : "Loading the private open-vocabulary model for the first time. This is a one-time large download.",
+        );
+      }
+
+      try {
+        const found = await detector.detect(source, labels, 0.08);
+        setOpenVocabularyDetections(found);
+        setVocabularyModelState("ready");
+        if (!options.silent) {
+          const foundLabels = [...new Set(found.map((item) => friendlyLabel(item.label)))];
+          setResultLabel("OPEN-VOCABULARY RESULT");
+          setResult(
+            foundLabels.length
+              ? `Found ${foundLabels.join(", ")}. These custom object names are now remembered on this device.`
+              : `I did not find ${labels.join(", ")} confidently in this frame. The names are remembered, so SceneLens can keep checking future frames.`,
+          );
+        }
+      } catch (error) {
+        setVocabularyModelState("error");
+        if (!options.silent) {
+          setResultLabel("EXPANDED MODEL UNAVAILABLE");
+          setResult(
+            error instanceof Error
+              ? `${error.message}. The fast 365-class detector is still active.`
+              : "The expanded-vocabulary scan failed. The fast detector is still active.",
+          );
+        }
+      } finally {
+        openVocabularyBusyRef.current = false;
+      }
+    },
+    [sourceKind],
+  );
+
+  const handleFindAnything = useCallback(() => {
+    const typed = parseVocabularyInput(vocabularyInput);
+    const labels = typed.length
+      ? typed
+      : learnedVocabularyRef.current.slice(-40);
+    if (labels.length === 0) {
+      setResultLabel("ADD OBJECT NAMES");
+      setResult("Enter one or more object names, separated by commas, before starting an expanded scan.");
+      return;
+    }
+    rememberVocabulary(labels);
+    void runOpenVocabularyScan(labels);
+  }, [rememberVocabulary, runOpenVocabularyScan, vocabularyInput]);
+
+  const handleClearLearnedVocabulary = useCallback(() => {
+    learnedVocabularyRef.current = [];
+    setLearnedVocabulary([]);
+    saveLearnedVocabulary([]);
+    setOpenVocabularyDetections([]);
+    setVocabularyInput("");
+    setResultLabel("LEARNED VOCABULARY CLEARED");
+    setResult("SceneLens removed the custom object names saved in this browser.");
+  }, []);
+
+  useEffect(() => {
+    if (
+      !continuousVocabulary ||
+      sourceKind !== "camera" ||
+      camera.state !== "live" ||
+      vocabularyModelState !== "ready" ||
+      learnedVocabularyRef.current.length === 0
+    ) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      const labels = learnedVocabularyRef.current.slice(-20);
+      void runOpenVocabularyScan(labels, { silent: true });
+    }, 8_000);
+    return () => window.clearInterval(timer);
+  }, [
+    camera.state,
+    continuousVocabulary,
+    runOpenVocabularyScan,
+    sourceKind,
+    vocabularyModelState,
+  ]);
+
   const handleStart = useCallback(async () => {
     const started = await camera.start();
     if (started) {
@@ -297,6 +438,7 @@ export default function Home() {
       trackerRef.current.reset();
       lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
+      setOpenVocabularyDetections([]);
       setImageUrl(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
       setResultLabel("LIVE OBJECT DETECTION");
@@ -311,6 +453,7 @@ export default function Home() {
     trackerRef.current.reset();
     setSourceKind("idle");
     setRawDetections([]);
+    setOpenVocabularyDetections([]);
     setProcessingTime(null);
   }, [camera]);
 
@@ -325,6 +468,7 @@ export default function Home() {
       trackerRef.current.reset();
       lastDetailInferenceRef.current = performance.now() - 3_200;
       setRawDetections([]);
+      setOpenVocabularyDetections([]);
       setImageUrl(null);
       setProcessingTime(null);
       setResultLabel("CAMERA CHANGED");
@@ -357,6 +501,7 @@ export default function Home() {
       setImageUrl(nextUrl);
       setSourceKind("upload");
       setRawDetections([]);
+      setOpenVocabularyDetections([]);
       setProcessingTime(null);
       setModelState(detectorReadyRef.current ? "ready" : "loading");
       setResultLabel("IMAGE LOADED");
@@ -376,8 +521,17 @@ export default function Home() {
     }
     if (sourceKind === "upload" && imageRef.current) {
       void runDetection(imageRef.current, { detailed: true });
+      if (
+        openVocabularyDetectorRef.current.isReady &&
+        learnedVocabularyRef.current.length > 0
+      ) {
+        void runOpenVocabularyScan(
+          learnedVocabularyRef.current.slice(-20),
+          { silent: true },
+        );
+      }
     }
-  }, [runDetection, sourceKind]);
+  }, [runDetection, runOpenVocabularyScan, sourceKind]);
 
   const handleDemo = useCallback(() => {
     camera.stop();
@@ -389,6 +543,7 @@ export default function Home() {
     setImageUrl(createDemoScene());
     setSourceKind("demo");
     setRawDetections([]);
+    setOpenVocabularyDetections([]);
     setResultLabel("DEMO SCENE");
     setResult(describeScene(demoDetections));
   }, [camera]);
@@ -531,7 +686,7 @@ export default function Home() {
                 ? "ON-DEVICE MODEL READY"
                 : "INITIALIZING VISION CORE"}
             </strong>
-            <small>{modelVariant} · GENERAL OBJECT DETECTION</small>
+            <small>{modelVariant} · 365 + OPEN VOCABULARY</small>
           </div>
         </div>
       </header>
@@ -546,9 +701,9 @@ export default function Home() {
           </h2>
         </div>
         <p>
-          SceneLens uses real-time AI to recognize people and everyday objects,
-          describe their context, and handle bottle-versus-person ambiguity more
-          carefully.
+          The fast model recognizes 365 categories automatically. Find Anything
+          adds open-vocabulary AI for nearly any named object and remembers the
+          vocabulary you teach it on this device.
         </p>
       </div>
 
@@ -586,6 +741,14 @@ export default function Home() {
           sceneDescription={sceneDescription}
           analyzing={remoteAnalyzing}
           detections={detections}
+          vocabularyInput={vocabularyInput}
+          onVocabularyInputChange={setVocabularyInput}
+          vocabularyModelState={vocabularyModelState}
+          learnedVocabulary={learnedVocabulary}
+          continuousVocabulary={continuousVocabulary}
+          onContinuousVocabularyChange={setContinuousVocabulary}
+          onFindAnything={handleFindAnything}
+          onClearLearnedVocabulary={handleClearLearnedVocabulary}
           question={question}
           onQuestionChange={setQuestion}
           onAsk={(prompt) => void handleAsk(prompt)}

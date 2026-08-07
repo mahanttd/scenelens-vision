@@ -20,11 +20,14 @@ test("server-renders the general-purpose SceneLens application shell", async () 
   const html = await response.text();
   assert.match(html, /<title>SceneLens/);
   assert.match(html, /REAL-TIME VISUAL ASSISTANCE/);
-  assert.match(html, /GENERAL OBJECT DETECTION/);
+  assert.match(html, /365 \+ OPEN VOCABULARY/);
   assert.match(html, /SCENE INTELLIGENCE/);
+  assert.match(html, /FIND ANYTHING/);
+  assert.match(html, /nearly any named object/i);
+  assert.match(html, /0(?:<!-- -->)? learned names/i);
   assert.match(html, /Ask about this frame/);
   assert.match(html, /Is that a water bottle/);
-  assert.match(html, /Bottles receive a lower detection threshold/i);
+  assert.match(html, /virtually unlimited named-object searches/i);
   assert.match(html, /NO FACIAL RECOGNITION/);
   assert.match(html, /CAMERA SOURCE/);
   assert.doesNotMatch(html, /aerospace|aircraft|airworthiness/i);
