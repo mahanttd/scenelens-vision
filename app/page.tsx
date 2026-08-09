@@ -42,7 +42,7 @@ import {
 import { demoDetections } from "../lib/yolo";
 
 const DEFAULT_RESULT =
-  "Choose a camera or image. SceneLens automatically detects 365 object categories, and Find Anything can search for almost any object name you provide.";
+  "Choose a camera or image. SceneLens combines broad automatic detection, a trained common-object specialist, and Find Anything for custom object names.";
 
 function uniqueId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -686,7 +686,7 @@ export default function Home() {
                 ? "ON-DEVICE MODEL READY"
                 : "INITIALIZING VISION CORE"}
             </strong>
-            <small>{modelVariant} · 365 + OPEN VOCABULARY</small>
+            <small>{modelVariant} · 365 + SPECIALIST + OPEN VOCABULARY</small>
           </div>
         </div>
       </header>
@@ -701,9 +701,9 @@ export default function Home() {
           </h2>
         </div>
         <p>
-          The fast model recognizes 365 categories automatically. Find Anything
-          adds open-vocabulary AI for nearly any named object and remembers the
-          vocabulary you teach it on this device.
+          The broad model recognizes 365 categories automatically. A trained
+          common-object specialist double-checks difficult cases, while Find
+          Anything adds open-vocabulary AI for nearly any named object.
         </p>
       </div>
 

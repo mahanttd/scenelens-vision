@@ -20,7 +20,7 @@ test("server-renders the general-purpose SceneLens application shell", async () 
   const html = await response.text();
   assert.match(html, /<title>SceneLens/);
   assert.match(html, /REAL-TIME VISUAL ASSISTANCE/);
-  assert.match(html, /365 \+ OPEN VOCABULARY/);
+  assert.match(html, /365 \+ SPECIALIST \+ OPEN VOCABULARY/);
   assert.match(html, /SCENE INTELLIGENCE/);
   assert.match(html, /FIND ANYTHING/);
   assert.match(html, /nearly any named object/i);

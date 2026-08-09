@@ -1,0 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.12.0+cu130
+torchvision==0.27.0+cu130
+ultralytics==8.4.117
+onnx==1.22.0
+onnxslim==0.1.95
+onnxruntime==1.28.0

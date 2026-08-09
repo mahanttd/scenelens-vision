@@ -1,0 +1,135 @@
+{
+  "map50": 0.860298,
+  "map50_95": 0.690117,
+  "precision_at_025_iou50": 0.621235,
+  "recall_at_025_iou50": 0.903507,
+  "per_class": {
+    "aeroplane": {
+      "ap50": 0.967106,
+      "map50_95": 0.76284,
+      "ground_truth_objects": 285,
+      "predictions": 3768
+    },
+    "bicycle": {
+      "ap50": 0.936273,
+      "map50_95": 0.738345,
+      "ground_truth_objects": 337,
+      "predictions": 7311
+    },
+    "bird": {
+      "ap50": 0.892554,
+      "map50_95": 0.676816,
+      "ground_truth_objects": 459,
+      "predictions": 7240
+    },
+    "boat": {
+      "ap50": 0.762545,
+      "map50_95": 0.542008,
+      "ground_truth_objects": 263,
+      "predictions": 11409
+    },
+    "bottle": {
+      "ap50": 0.787883,
+      "map50_95": 0.57524,
+      "ground_truth_objects": 469,
+      "predictions": 15182
+    },
+    "bus": {
+      "ap50": 0.948521,
+      "map50_95": 0.867367,
+      "ground_truth_objects": 213,
+      "predictions": 3105
+    },
+    "car": {
+      "ap50": 0.856523,
+      "map50_95": 0.70748,
+      "ground_truth_objects": 1201,
+      "predictions": 32301
+    },
+    "cat": {
+      "ap50": 0.940094,
+      "map50_95": 0.828032,
+      "ground_truth_objects": 358,
+      "predictions": 2812
+    },
+    "chair": {
+      "ap50": 0.614386,
+      "map50_95": 0.470385,
+      "ground_truth_objects": 756,
+      "predictions": 39861
+    },
+    "cow": {
+      "ap50": 0.890982,
+      "map50_95": 0.719046,
+      "ground_truth_objects": 244,
+      "predictions": 4595
+    },
+    "diningtable": {
+      "ap50": 0.762066,
+      "map50_95": 0.640164,
+      "ground_truth_objects": 206,
+      "predictions": 12166
+    },
+    "dog": {
+      "ap50": 0.92776,
+      "map50_95": 0.793894,
+      "ground_truth_objects": 489,
+      "predictions": 4595
+    },
+    "horse": {
+      "ap50": 0.952171,
+      "map50_95": 0.80773,
+      "ground_truth_objects": 348,
+      "predictions": 3366
+    },
+    "motorbike": {
+      "ap50": 0.915591,
+      "map50_95": 0.705281,
+      "ground_truth_objects": 325,
+      "predictions": 7203
+    },
+    "person": {
+      "ap50": 0.906693,
+      "map50_95": 0.704843,
+      "ground_truth_objects": 4528,
+      "predictions": 93295
+    },
+    "pottedplant": {
+      "ap50": 0.656514,
+      "map50_95": 0.421529,
+      "ground_truth_objects": 480,
+      "predictions": 16778
+    },
+    "sheep": {
+      "ap50": 0.897731,
+      "map50_95": 0.71905,
+      "ground_truth_objects": 242,
+      "predictions": 4494
+    },
+    "sofa": {
+      "ap50": 0.769302,
+      "map50_95": 0.689847,
+      "ground_truth_objects": 239,
+      "predictions": 11621
+    },
+    "train": {
+      "ap50": 0.945422,
+      "map50_95": 0.794865,
+      "ground_truth_objects": 282,
+      "predictions": 2553
+    },
+    "tvmonitor": {
+      "ap50": 0.875838,
+      "map50_95": 0.637587,
+      "ground_truth_objects": 308,
+      "predictions": 4179
+    }
+  },
+  "label": "YOLO26s COCO pretrained",
+  "model": "yolo26s.pt",
+  "dataset": "Pascal VOC 2007 test",
+  "images": 4952,
+  "imgsz": 640,
+  "confidence_floor": 0.001,
+  "average_gpu_inference_ms": 6.585
+}

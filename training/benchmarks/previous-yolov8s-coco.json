@@ -1,0 +1,135 @@
+{
+  "map50": 0.836738,
+  "map50_95": 0.65429,
+  "precision_at_025_iou50": 0.588784,
+  "recall_at_025_iou50": 0.897025,
+  "per_class": {
+    "aeroplane": {
+      "ap50": 0.934275,
+      "map50_95": 0.709474,
+      "ground_truth_objects": 285,
+      "predictions": 4341
+    },
+    "bicycle": {
+      "ap50": 0.922899,
+      "map50_95": 0.706308,
+      "ground_truth_objects": 337,
+      "predictions": 6644
+    },
+    "bird": {
+      "ap50": 0.872756,
+      "map50_95": 0.64922,
+      "ground_truth_objects": 459,
+      "predictions": 6791
+    },
+    "boat": {
+      "ap50": 0.714861,
+      "map50_95": 0.490593,
+      "ground_truth_objects": 263,
+      "predictions": 12755
+    },
+    "bottle": {
+      "ap50": 0.783602,
+      "map50_95": 0.572879,
+      "ground_truth_objects": 469,
+      "predictions": 14412
+    },
+    "bus": {
+      "ap50": 0.929887,
+      "map50_95": 0.825683,
+      "ground_truth_objects": 213,
+      "predictions": 1982
+    },
+    "car": {
+      "ap50": 0.821492,
+      "map50_95": 0.66412,
+      "ground_truth_objects": 1201,
+      "predictions": 27478
+    },
+    "cat": {
+      "ap50": 0.893509,
+      "map50_95": 0.754578,
+      "ground_truth_objects": 358,
+      "predictions": 2071
+    },
+    "chair": {
+      "ap50": 0.57816,
+      "map50_95": 0.430632,
+      "ground_truth_objects": 756,
+      "predictions": 41330
+    },
+    "cow": {
+      "ap50": 0.900589,
+      "map50_95": 0.724956,
+      "ground_truth_objects": 244,
+      "predictions": 3331
+    },
+    "diningtable": {
+      "ap50": 0.745776,
+      "map50_95": 0.590357,
+      "ground_truth_objects": 206,
+      "predictions": 13344
+    },
+    "dog": {
+      "ap50": 0.897747,
+      "map50_95": 0.73884,
+      "ground_truth_objects": 489,
+      "predictions": 2539
+    },
+    "horse": {
+      "ap50": 0.946217,
+      "map50_95": 0.769968,
+      "ground_truth_objects": 348,
+      "predictions": 2647
+    },
+    "motorbike": {
+      "ap50": 0.927703,
+      "map50_95": 0.691923,
+      "ground_truth_objects": 325,
+      "predictions": 5510
+    },
+    "person": {
+      "ap50": 0.903907,
+      "map50_95": 0.683599,
+      "ground_truth_objects": 4528,
+      "predictions": 98427
+    },
+    "pottedplant": {
+      "ap50": 0.571791,
+      "map50_95": 0.358408,
+      "ground_truth_objects": 480,
+      "predictions": 18470
+    },
+    "sheep": {
+      "ap50": 0.874795,
+      "map50_95": 0.702882,
+      "ground_truth_objects": 242,
+      "predictions": 3205
+    },
+    "sofa": {
+      "ap50": 0.741522,
+      "map50_95": 0.656232,
+      "ground_truth_objects": 239,
+      "predictions": 7944
+    },
+    "train": {
+      "ap50": 0.917528,
+      "map50_95": 0.741878,
+      "ground_truth_objects": 282,
+      "predictions": 2888
+    },
+    "tvmonitor": {
+      "ap50": 0.855739,
+      "map50_95": 0.623266,
+      "ground_truth_objects": 308,
+      "predictions": 3745
+    }
+  },
+  "label": "Previous SceneLens YOLOv8s fallback",
+  "model": "yolov8s.pt",
+  "dataset": "Pascal VOC 2007 test",
+  "images": 4952,
+  "imgsz": 640,
+  "confidence_floor": 0.001,
+  "average_gpu_inference_ms": 3.598
+}

@@ -1,0 +1,32 @@
+{
+  "source": "scenelens-v3-voc.onnx",
+  "bytes": 38197559,
+  "sha256": "90a6a7bb1c8e3c7e8d5dfd4aa78c2ee58ecdee546698d2494e65145f8fbcfe38",
+  "parts": [
+    {
+      "file": "scenelens-v3-voc.onnx.part-01",
+      "bytes": 8000000,
+      "sha256": "a14079ab9f025749df6d12bff2c543a31783117a9c2f91b3f07b39d6a5655271"
+    },
+    {
+      "file": "scenelens-v3-voc.onnx.part-02",
+      "bytes": 8000000,
+      "sha256": "d44be0f8a7137d46b99e23831db7c45f005133da301eacbafdb1d83c6c59e21a"
+    },
+    {
+      "file": "scenelens-v3-voc.onnx.part-03",
+      "bytes": 8000000,
+      "sha256": "8a93ceddec77447a0106764c93b2474e7922b996e6391e6d144456e94721edb1"
+    },
+    {
+      "file": "scenelens-v3-voc.onnx.part-04",
+      "bytes": 8000000,
+      "sha256": "3c281c4d022c4c598b1f7dc4725f6b94c00852d6019a879516e41753ce93c0c6"
+    },
+    {
+      "file": "scenelens-v3-voc.onnx.part-05",
+      "bytes": 6197559,
+      "sha256": "c24483ad02cd1051019f295edca8d403ed459a0f9bd1b5a80bdca01556cfd448"
+    }
+  ]
+}

@@ -9,7 +9,7 @@ export type Detection = {
   id: string;
   label: string;
   confidence: number;
-  source?: "automatic" | "open-vocabulary";
+  source?: "automatic" | "open-vocabulary" | "specialist";
   box: BoundingBox;
 };
 

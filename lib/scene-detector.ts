@@ -1,4 +1,5 @@
 import type { BoundingBox, Detection } from "./types";
+import { SpecialistDetector } from "./specialist-detector";
 import { nonMaximumSuppression, YoloDetector } from "./yolo";
 
 const SCENE_MODEL_ID = "onnx-community/dfine_s_obj365-ONNX";
@@ -109,6 +110,7 @@ export function mergeSceneDetections(detections: Detection[]) {
 export class SceneDetector {
   private detector: ObjectDetectionPipeline | null = null;
   private fallback: YoloDetector | null = null;
+  private specialist: SpecialistDetector | null = null;
   private loading: Promise<void> | null = null;
   private activeModel = "D-FINE-S object model";
 
@@ -117,9 +119,16 @@ export class SceneDetector {
   }
 
   async load() {
-    if (this.detector || this.fallback) return;
+    if (this.detector || this.fallback || this.specialist) return;
     if (this.loading) return this.loading;
     this.loading = (async () => {
+      const specialist = new SpecialistDetector();
+      const specialistLoading = specialist
+        .load()
+        .then(() => {
+          this.specialist = specialist;
+        })
+        .catch(() => undefined);
       try {
         const { pipeline } = await import("@huggingface/transformers");
         this.detector = await pipeline("object-detection", SCENE_MODEL_ID, {
@@ -132,6 +141,10 @@ export class SceneDetector {
         await fallback.load();
         this.fallback = fallback;
         this.activeModel = `${fallback.modelName} fallback`;
+      }
+      await specialistLoading;
+      if (this.specialist) {
+        this.activeModel = `${this.activeModel} + SceneLens v3 specialist`;
       }
     })();
     try {
@@ -147,35 +160,44 @@ export class SceneDetector {
     options: { detailed?: boolean } = {},
   ) {
     await this.load();
-    if (this.fallback) {
-      const detections = await this.fallback.detect(
-        source,
-        minimumConfidence,
-        options,
-      );
-      return resolveObjectConflicts(detections);
-    }
-    if (!this.detector) throw new Error("The object-detection AI did not initialize");
-
-    const output = await this.detector(sourceCanvas(source), {
-      threshold: Math.min(minimumConfidence, 0.12),
-      percentage: true,
-    });
-    const detections: Detection[] = [];
-    for (const [index, item] of output.entries()) {
-      const label = normalizeObjectLabel(item.label);
-      if (!label) continue;
-      const x = clamp(item.box.xmin);
-      const y = clamp(item.box.ymin);
-      const right = clamp(item.box.xmax);
-      const bottom = clamp(item.box.ymax);
-      if (right <= x || bottom <= y) continue;
-      detections.push({
-        id: `${label}-${index}`,
-        label,
-        confidence: item.score,
-        box: { x, y, width: right - x, height: bottom - y },
+    const primaryDetection = async () => {
+      if (this.fallback) {
+        return this.fallback.detect(source, minimumConfidence, options);
+      }
+      if (!this.detector) throw new Error("The object-detection AI did not initialize");
+      const output = await this.detector(sourceCanvas(source), {
+        threshold: Math.min(minimumConfidence, 0.12),
+        percentage: true,
       });
+      const detections: Detection[] = [];
+      for (const [index, item] of output.entries()) {
+        const label = normalizeObjectLabel(item.label);
+        if (!label) continue;
+        const x = clamp(item.box.xmin);
+        const y = clamp(item.box.ymin);
+        const right = clamp(item.box.xmax);
+        const bottom = clamp(item.box.ymax);
+        if (right <= x || bottom <= y) continue;
+        detections.push({
+          id: `${label}-${index}`,
+          label,
+          confidence: item.score,
+          source: "automatic" as const,
+          box: { x, y, width: right - x, height: bottom - y },
+        });
+      }
+      return detections;
+    };
+
+    const results = await Promise.allSettled([
+      primaryDetection(),
+      this.specialist?.detect(source, minimumConfidence) ?? Promise.resolve([]),
+    ]);
+    const detections = results.flatMap((result) =>
+      result.status === "fulfilled" ? result.value : [],
+    );
+    if (!detections.length && results.every((result) => result.status === "rejected")) {
+      throw new Error("The object-detection AI could not analyze this frame");
     }
     return mergeSceneDetections(detections);
   }

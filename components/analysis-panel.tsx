@@ -18,6 +18,7 @@ import {
 import type { FormEvent } from "react";
 import { friendlyLabel } from "../lib/reasoning";
 import type { Detection, VocabularyModelState } from "../lib/types";
+import { ModelBenchmark } from "./model-benchmark";
 
 type Props = {
   result: string;
@@ -130,6 +131,8 @@ export function AnalysisPanel({
         </div>
         <p>{sceneDescription}</p>
       </section>
+
+      <ModelBenchmark />
 
       <section className="vocabulary-card" aria-labelledby="vocabulary-heading">
         <div className="vocabulary-card__header">

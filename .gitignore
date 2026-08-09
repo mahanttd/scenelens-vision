@@ -42,3 +42,9 @@ yarn-error.log*
 /.wrangler/
 /outputs/
 /work/
+/.venv-training/
+/training/data/
+/training/runs/
+/training/cache/
+/yolo*.pt
+**/__pycache__/

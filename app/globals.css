@@ -860,6 +860,82 @@ input[type="range"]::-webkit-slider-thumb {
   color: #ffaaa5;
 }
 
+.benchmark-card {
+  margin-bottom: 10px;
+  border: 1px solid rgba(124, 167, 255, 0.22);
+  padding: 11px 13px;
+  background: rgba(124, 167, 255, 0.035);
+}
+
+.benchmark-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #a9c5ff;
+  font-family: var(--font-data);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.benchmark-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.benchmark-card summary span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.benchmark-card summary strong {
+  color: var(--cyan-bright);
+  font-weight: 600;
+}
+
+.benchmark-table {
+  margin-top: 11px;
+  border-top: 1px solid rgba(124, 167, 255, 0.14);
+}
+
+.benchmark-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 0.9fr;
+  gap: 7px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(124, 167, 255, 0.09);
+  color: #aebfc3;
+  font-family: var(--font-data);
+  font-size: 7px;
+}
+
+.benchmark-row--header {
+  color: var(--subtle);
+  text-transform: uppercase;
+}
+
+.benchmark-row strong {
+  color: #e2eeee;
+}
+
+.benchmark-row .is-positive {
+  color: #79dfb1;
+}
+
+.benchmark-row .is-negative {
+  color: #ffaaa5;
+}
+
+.benchmark-card > small {
+  display: block;
+  margin-top: 9px;
+  color: var(--subtle);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
 .vocabulary-card {
   margin-bottom: 10px;
   border: 1px solid rgba(69, 220, 224, 0.25);
