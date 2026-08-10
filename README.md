@@ -1,146 +1,172 @@
 # SceneLens
 
-SceneLens is a privacy-first, real-time AI security-monitoring assistant. It runs a pretrained YOLOv8s model in the browser, highlights people and a narrow set of supported potential hazards, produces cautious security summaries, estimates whether a potential hazard may be near a person’s hand, and narrates results.
+Privacy-first, real-time AI object detection and scene understanding in the browser.
 
-The base application does not require a paid AI service. Camera frames and uploaded images remain in the browser for on-device inference. Optional remote vision verification occurs only after the user enables it and explicitly asks a question or captures a frame.
+[Open the live application](https://scenelens-vision.mk1l.chatgpt.site/) | [View the benchmark report](public/benchmarks/scenelens-v3.json) | [Read the training notes](training/README.md)
 
-## Features
+SceneLens analyzes a webcam feed or uploaded image with three complementary computer-vision models. It automatically detects everyday objects, uses a trained specialist to reduce difficult person/object mix-ups, and can search for user-supplied object names. It then turns the detections into a plain-language scene description.
 
-- Live camera access with a named webcam/device picker, quick cycling, start, stop, capture, permission errors, and image upload fallback
-- On-device YOLOv8s detection through ONNX Runtime Web with temporal stabilization, confidence filtering, bounding boxes, confidence scores, and timing telemetry
-- Periodic overlapping detail passes for better small-object detection in live video and uploads
-- Security-only filtering that suppresses ordinary objects and retains people, possible knives, scissors, and baseball bats
-- Cautious person–hazard proximity estimates based on an approximate hand region, object proximity, overlap, scale, and detector confidence
-- Automatic security summaries with people counts, potential-hazard positions, review status, and custom questions
-- Browser speech synthesis with opt-in speech, replay, stop, and rate-limited automatic narration
-- Browser-local IndexedDB capture history with individual deletion, clear-all, and a 40-record cap
-- Explicit-only, server-side remote vision integration with MIME checks, size validation, rate limiting, timeouts, and guarded error messages
-- Simulated detection scene for development or camera-free exploration
-- Responsive keyboard-accessible dark HUD interface with reduced-motion support
+The current application is general-purpose visual assistance. It is not aerospace-specific or limited to security objects.
 
-SceneLens never performs facial recognition, never identifies individuals, and never claims that a detected object establishes intent. The current COCO model does not detect firearms.
+## What SceneLens can do
 
-## Architecture
+- Analyze a live webcam, switch between available cameras, or inspect an uploaded image.
+- Detect broad everyday-object categories with D-FINE-S trained on Objects365.
+- Double-check 20 common categories with the custom SceneLens v3 YOLO26s specialist.
+- Search for custom object names with the OWL-ViT open-vocabulary model.
+- Resolve common conflicts such as an upright bottle being mistaken for a person.
+- Describe the visible scene, count people, answer object questions, and estimate whether a nearby object may be held.
+- Draw labeled bounding boxes with confidence scores and adjustable filtering.
+- Save captures locally in IndexedDB and optionally narrate descriptions with browser speech synthesis.
+- Run the normal detection pipeline on-device without continuously uploading camera frames.
+- Show the held-out benchmark directly inside the application.
+
+## Vision pipeline
 
 ```text
-Camera / uploaded image
-        │
-        ├── Browser YOLOv8s + ONNX Runtime Web ──> stable detections + overlay
-        │                                             │
-        │                                             ├── security-only filtering
-        │                                             ├── potential-hazard proximity estimate
-        │                                             └── speech synthesis
-        │
-        ├── explicit capture ──> IndexedDB history on this device
-        │
-        └── explicit question/capture + remote toggle
-                    └── /api/analyze ──> optional server-only vision provider
+webcam / uploaded image / demo frame
+                 |
+                 +-- D-FINE-S Objects365 ------ broad automatic coverage
+                 |
+                 +-- SceneLens v3 specialist -- high-precision second opinion
+                 |
+                 +-- OWL-ViT ------------------ custom Find Anything labels
+                                      |
+                                      v
+                         merge + conflict resolution
+                                      |
+                                      v
+                     boxes + scene description + Q&A
 ```
 
-Key modules:
+| Component | Purpose | Runtime |
+| --- | --- | --- |
+| D-FINE-S Objects365 | Primary automatic detector with broad category coverage | Transformers.js, quantized WASM |
+| SceneLens v3 | Fine-tuned YOLO26s specialist for 20 common VOC categories | ONNX Runtime Web, WASM |
+| OWL-ViT | Open-vocabulary detection for user-entered labels | Transformers.js, quantized WASM |
+| Scene reasoning | Scene summaries, counts, positions, surface and holding estimates | Local TypeScript |
+| Optional remote analysis | User-triggered second opinion from a configured vision provider | Server route, disabled by default |
 
-- `hooks/use-camera.ts`: media permission, stream lifecycle, camera discovery, named webcam selection, and switching
-- `lib/yolo.ts`: model loading, letterbox preprocessing, YOLO output parsing, and non-maximum suppression
-- `lib/reasoning.ts`: security-class filtering, cautious summaries, custom questions, and spatial proximity estimates
-- `hooks/use-speech.ts`: speech synthesis and replay controls
-- `lib/history-store.ts`: IndexedDB persistence and a memory adapter used by tests
-- `app/api/analyze/route.ts`: optional remote provider boundary and server-side safeguards
-- `components/`: camera viewport, analysis controls, status display, and capture history
+If D-FINE cannot initialize, SceneLens falls back to an in-browser YOLOv8 detector. Failure of the specialist does not prevent the broad detector from working.
 
-No Python service is required because YOLO inference runs in the browser. The app remains compatible with a future FastAPI detector if server-side GPU inference becomes necessary.
+## SceneLens v3 benchmark
 
-## Installation
+All three checkpoints were evaluated with the same settings on the untouched 4,952-image Pascal VOC 2007 test set at 640 pixels. The test split was excluded from training and checkpoint selection.
 
-Requirements: Node.js 22.13 or newer and npm.
+| Model | mAP50 | mAP50-95 | Precision | Recall | GPU inference |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Previous SceneLens YOLOv8s fallback | 83.67% | 65.43% | 58.88% | 89.70% | 3.60 ms |
+| YOLO26s pretrained starting point | 86.03% | 69.01% | 62.12% | 90.35% | 6.59 ms |
+| **SceneLens v3 trained specialist** | **85.22%** | **66.01%** | **76.42%** | **83.98%** | **4.29 ms** |
+
+Compared with the previous app fallback, the trained specialist improves mAP50 by 1.55 points, mAP50-95 by 0.58 points, and precision by 17.54 points, with a 5.72-point recall tradeoff. The pretrained YOLO26s checkpoint retains the highest overall AP and recall. For that reason, SceneLens v3 is used as a high-precision second opinion instead of replacing the broad detector.
+
+The full machine-readable results, including per-class AP, are in [`public/benchmarks/scenelens-v3.json`](public/benchmarks/scenelens-v3.json).
+
+## Local development
+
+Requirements:
+
+- Node.js 22.13 or newer
+- npm
+- A modern browser with camera support, or an image to upload
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Camera access normally requires `localhost` or HTTPS. If no camera is available, upload a JPEG, PNG, or WebP image or select **Demo scene**.
+Open `http://localhost:3000`. Browser camera access normally requires `localhost` or HTTPS.
 
-## Environment variables
+The first analysis downloads the runtime models and WebAssembly files. Startup time depends on the network and browser cache. No Python service is required to run the application.
 
-Copy `.env.example` to `.env.local` only when remote vision verification is needed:
+## Optional remote vision
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `VISION_API_URL` | Optional | Server-side endpoint for an OpenAI-compatible multimodal chat API |
-| `VISION_API_KEY` | Optional | Secret bearer token used only by the server route |
-| `VISION_MODEL` | Optional | Provider model identifier |
+SceneLens works without a paid AI API. Remote analysis is optional and only runs after the user enables it and explicitly asks a question or captures a frame.
 
-All three variables must be present for remote verification. They are never exposed in browser code. Do not commit `.env.local` or any real credential.
+Copy `.env.example` to `.env.local` and supply all three values to enable it:
 
-## How the AI components work
+| Variable | Purpose |
+| --- | --- |
+| `VISION_API_URL` | OpenAI-compatible multimodal chat endpoint |
+| `VISION_API_KEY` | Server-only bearer token |
+| `VISION_MODEL` | Provider model identifier |
 
-The browser loads the versioned YOLOv8s model asset from its attributed Hugging Face repository and uses ONNX Runtime Web’s WebAssembly execution provider. If the accuracy model cannot initialize, SceneLens falls back to YOLOv8n. The version-pinned WebAssembly runtime is fetched from jsDelivr on first use, while all inference and image processing stay on the device. Each video frame is resized and letterboxed to 640×640, converted to a normalized channel-first tensor, and processed locally. SceneLens reads the 80 COCO class scores, maps coordinates back to the displayed source, applies class-aware non-maximum suppression, stabilizes matching detections across frames, then suppresses everything except people and the supported potential-hazard classes. Live video receives periodic overlapping detail passes; uploaded images receive the same two detail passes in addition to full-frame analysis. Frames are never sent continuously to a server.
+Never commit `.env.local` or real credentials.
 
-YOLOv8s recognizes common COCO objects, but the interface intentionally reports only people, knives, scissors, and baseball bats. It does not recognize firearms, understand intent, or cover every hazardous object. Security summaries report only supported detections, counts, positions, and uncertainty.
+## Privacy
 
-When remote verification is enabled, an explicit analysis action captures a resized JPEG (maximum 960 px on its longest side) and sends it to the server route. The route accepts JPEG, PNG, and WebP data URLs up to 5 MB, limits each client to eight requests per minute, applies a 15-second provider timeout, and instructs the provider to avoid identity claims and certified safety conclusions.
+- Live camera frames are processed locally during normal detection.
+- Uploaded images stay in the browser unless remote analysis is explicitly enabled and requested.
+- Capture history is stored in IndexedDB on the current device.
+- Learned Find Anything labels are device-local preferences.
+- SceneLens does not perform facial recognition or identify people.
+- Optional remote requests are explicit, size-limited, rate-limited, and sent through a server-only route.
 
-## How “person near a potential hazard” is estimated
+## Repository layout
 
-For every detected person, SceneLens approximates left and right hand regions at the outer mid-torso. Supported potential-hazard candidates must be reasonably small and near the person’s interaction zone. A score combines:
+```text
+app/                         application routes, metadata, and optional API
+components/                  camera, analysis, benchmark, and history UI
+hooks/                       camera and speech lifecycle
+lib/                         detectors, reasoning, tracking, storage, and types
+public/models/               SceneLens v3 ONNX chunks and model documentation
+public/benchmarks/           held-out benchmark report used by the UI
+training/                    reproducible VOC preparation, training, export, and evaluation
+tests/                       detector, reasoning, storage, API, and render tests
+.openai/hosting.json         required OpenAI Sites project binding
+```
 
-- distance from the candidate object’s center to the nearest estimated hand point;
-- overlap with the person bounding box;
-- object detection confidence; and
-- whether the object has a plausible size for holding.
+The `.openai` directory name is required by OpenAI Sites. It contains the deployment project binding, not API keys, training images, or model weights.
 
-Ordinary objects are excluded. Low scores produce no proximity claim. Successful results use cautious language and display an estimated spatial confidence. This is not hand-pose tracking and can be wrong when people overlap, hands are hidden, or the camera angle is unusual.
+## Training and model export
 
-## Privacy and safety limitations
+The specialist used 14,896 development images for training and 1,655 for validation. Training ran for a 13-epoch first stage followed by a 20-epoch lower-learning-rate continuation. The VOC 2007 test set remained untouched until final evaluation.
 
-- Live frames remain on the device. SceneLens does not continuously upload video.
-- Uploads also remain local unless remote verification is both enabled and explicitly requested.
-- Captures are stored in browser IndexedDB on the current device; deleting browser storage removes them.
-- SceneLens has no facial-recognition or person-identification feature.
-- The current model does not detect firearms, smoke, fire, explosives, or many other hazards.
-- A possible knife, scissors, or baseball bat detection does not establish intent or danger.
-- SceneLens is not an emergency, alarm, or certified security system and must not replace human review or emergency response.
-- Model detections can be biased, incomplete, or incorrect. Low light, occlusion, blur, distance, and unfamiliar objects reduce accuracy.
-- General-purpose object detection cannot establish intent, verify identity, or reliably interpret subtle conditions that fall outside its training classes.
+The selected checkpoint is exported to ONNX and losslessly split into five host-safe files. The browser downloads and reassembles the exact bytes before creating the ONNX Runtime session. Dataset downloads, virtual environments, runs, and large intermediate checkpoints are intentionally ignored by Git.
 
-## Testing
+See [`training/README.md`](training/README.md) for the reproducible commands and evaluation protocol.
+
+## Validation
 
 ```bash
 npm run lint
 npm run test:unit
 npm run test:render
+npm run build
+```
+
+An optional Playwright flow is also available:
+
+```bash
 npm run test:e2e
 ```
 
-Unit coverage includes hazard filtering, spatial proximity logic, confidence boundaries, local history behavior, input validation, and remote API errors. The render test verifies the deployed worker output. The Playwright end-to-end test opens the application, uploads a generated PNG test image, and requests a local security summary without camera access.
+## Deployment
 
-The first Playwright run may require:
-
-```bash
-npx playwright install chromium
-```
-
-## Build and deployment
+The application uses the Sites-compatible Vinext/Vite worker structure and produces Cloudflare Worker-compatible ESM output.
 
 ```bash
 npm run build
 npm run start
 ```
 
-The project uses the Sites-compatible Vinext/Vite worker structure and produces Cloudflare Worker-compatible ESM output. For Sites hosting, configure optional environment values as hosted secrets, save a version from the pushed source commit, and deploy that saved version. Leave the environment unset for an on-device-only deployment.
+The current production deployment is [scenelens-vision.mk1l.chatgpt.site](https://scenelens-vision.mk1l.chatgpt.site/). Keep `.openai/hosting.json` in place so future Sites versions update the same application.
 
-Camera access requires HTTPS on a deployed domain. The first on-device analysis needs network access to fetch the 44.8 MB accuracy model and version-pinned WebAssembly runtime; subsequent behavior depends on the browser cache.
+## Limitations
 
-## Future improvements
+- Object detection is probabilistic and can still be wrong, especially with blur, occlusion, low light, unusual viewpoints, or very small objects.
+- Open-vocabulary results depend heavily on the wording of the requested labels.
+- A spatial holding estimate is not hand-pose tracking and must be treated as uncertain.
+- The specialist covers 20 VOC categories; broader coverage comes from D-FINE and OWL-ViT.
+- Scene descriptions are generated from detections and simple spatial reasoning, not complete human-level visual understanding.
+- SceneLens is not an emergency, medical, safety-certification, or identity system.
 
-- Add a dedicated, evaluated security-object model for firearm and broader hazard coverage
-- Add a hand-pose model to improve person–hazard proximity estimates
-- Move inference to a Web Worker and enable WebGPU when browser support is dependable
-- Add model integrity verification and managed model-version updates
-- Add encrypted export/import for local history
-- Add offline application caching after the first model download
-- Support an optional FastAPI/GPU inference service for constrained enterprise deployments
+## Model sources and attribution
 
-## Model attribution
+- D-FINE-S Objects365: [`onnx-community/dfine_s_obj365-ONNX`](https://huggingface.co/onnx-community/dfine_s_obj365-ONNX)
+- OWL-ViT: [`onnx-community/owlvit-base-patch32-ONNX`](https://huggingface.co/onnx-community/owlvit-base-patch32-ONNX)
+- YOLO fallback assets: [`cabelo/yolov8`](https://huggingface.co/cabelo/yolov8)
+- SceneLens v3: YOLO26s fine-tuned on Pascal VOC and exported by this repository's training pipeline
 
-The YOLOv8s ONNX asset is sourced from the [cabelo/yolov8 model repository](https://huggingface.co/cabelo/yolov8/blob/main/yolov8s.onnx), which identifies the model license as CreativeML Open RAIL-M. Review both the model repository and upstream Ultralytics licensing before commercial redistribution.
+Review the upstream model and dataset licenses before redistribution or commercial use.

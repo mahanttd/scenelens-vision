@@ -1,7 +1,13 @@
 {
   "name": "scenelens",
-  "version": "0.1.0",
+  "version": "3.0.0",
+  "description": "Privacy-first, real-time AI object detection and scene understanding in the browser.",
   "private": true,
+  "homepage": "https://scenelens-vision.mk1l.chatgpt.site/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mahanttd/scenelens-vision.git"
+  },
   "engines": {
     "node": ">=22.13.0"
   },
